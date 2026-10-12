@@ -75,24 +75,21 @@ def plot_tot_lego(tot_means):
     x, y = col.ravel(), row.ravel()
     top = tot_means.ravel()
     good = ~np.isnan(top)
-
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(projection="3d")
-
     if good.any():
         vmin, vmax = np.nanmin(top), np.nanmax(top)
         colors = plt.cm.plasma((top[good] - vmin) / max(vmax - vmin, 1e-9))
         ax.bar3d(x[good], y[good], 0, 0.9, 0.9, top[good], color=colors, shade=True)
-
     ax.set_xlabel("Column")
     ax.set_ylabel("Row")
     ax.set_zlabel("Mean ToT [µs]")
     ax.set_title(f"Mean ToT\n{SETTINGS}")
-
     output_file = TOT_DIR / f"tot_mean_lego_{TAG}.png"
     fig.savefig(output_file, dpi=150, bbox_inches="tight")
     plt.close(fig)
     print(f"Saved {output_file}")
+
 
 #---plots a 2d histogram of the hits in all pixels --
 def plot_hits(nhits):

@@ -16,10 +16,11 @@ from analyze_data_sl_tot import SPARCAnalyser
 
 ROOT = Path(__file__).resolve().parents[2] 
 # Default data: the Vh scan with pulse duration = 250 (SPARC.toml, run with injection_scan_sl.py), only Vcasb = 300 mV, complete up to DATA_VH[-1]
-DATA_DIR = ROOT / "data" / "sparc0" / "injection_pd_250"
-PLOT_DIR = ROOT / "plots" / "Injections"
-OLD_PLOT_DIR = ROOT / "plots" / "WrongInjections"  # plots of the older data sets in EXTRA_DATASETS
-CACHE_DIR = ROOT / "cache"  # one subfolder per data folder, so fits of different data sets never mix
+DATA_DIR = ROOT / "data" / "sparc7" / "injection_pd_250"
+PLOT_DIR = ROOT / "plots" / "sparc7" 
+
+OLD_PLOT_DIR = ROOT / "plots" / "WrongInjections" 
+CACHE_DIR = ROOT / "cache"  
 
 NROWS = SPARCAnalyser.NROWS
 NCOLS = SPARCAnalyser.NCOLS
@@ -28,7 +29,7 @@ TOT_US_PER_COUNT = 0.004  # one ToT count is 4 ns; all ToT values in this code a
 
 SCAN_VH = [25, 50, 75, 100, 125, 150, 175, 200, 300, 400, 500, 600, 700, 800, 900, 1000, 1100, 1200]
 DATA_VCASB = 300
-DATA_VH = SCAN_VH  # the Vh values that are complete in DATA_DIR; add new ones here
+DATA_VH = SCAN_VH  
 
 # Older injection data sets, each a Vh scan at one Vcasb in its own folder, selectable in the scripts by name.
 # "vh_scan" lists the Vh values that are complete (see fit_dataset).
@@ -42,7 +43,6 @@ EXTRA_DATASETS = {
 
 
 #-------Reads the raw file and loads hitmap etc------
-# data_dir is DATA_DIR unless another injection data folder is given, e.g. EXTRA_DATASETS["ireset"]["data_dir"]
 def raw_file(vcasb, vh, col, row, data_dir=DATA_DIR):
     return Path(data_dir) / f"data_run_vcasb_{vcasb}_vh_{vh}_px_{col}_{row}.raw"
 
