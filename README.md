@@ -1,28 +1,25 @@
 # SPARC injection and fake-hit-rate analysis
 
-Data taking and analysis scripts for the SPARC pixel chip (28 columns × 32 rows): injection scans
-(threshold, efficiency and time-over-threshold per pixel) and fake-hit-rate measurements.
+This repo contains scripts for data taking and analysis for the SPARC chip (28 columns × 32 rows). 
 
 ## Layout
 
 ```
 Nellie/
-├── SPARC.toml                  chip configuration used for data taking (voltages, pulse duration, registers)
-├── injection_scan_sl.py        injection scan: one pixel at a time, 10000 injections per pixel and setting
-├── injection_scan_new.py       older version of the injection scan
-├── fhr_scan.py                 fake-hit-rate scan
+├── SPARC.toml                  config file for the chip
+├── injection_scan_sl.py        injection scan: injects pixel at a time. 10000 times per pixel and Vh/Vcasb
+├── fhr_scan.py                 fake-hit-rate scan (only measuring noise)
 ├── sparc_masking_generator.py  register values to mask / unmask pixels
-├── sparc_ireset_calculator.py  converts between the reset current and its DAC setting
+├── sparc_ireset_calculator.py  converts between Ireset and Vreset
 ├── analysis/
 │   ├── analyze_data_sl.py      SPARCAnalyser: reads a raw file (hitmap, active pixels)
-│   ├── analyze_data_sl_tot.py  the same, plus the ToT of every hit and the decoder ToT limits
+│   ├── analyze_data_sl_tot.py  Also returns ToT data
 │   ├── Injections/             injection analysis (see below)
 │   └── FakeHitRate/            fake-hit-rate analysis
 └── plots/                      output of the analysis scripts
 ```
 
-Not in the repository (see `.gitignore`): `data/` (the raw files, tens of GB), `cache/` (fitted results,
-recreated automatically) and `venv/`.
+Not in the repository (see `.gitignore`): `data/` (the raw files), `cache/` (fitted results) and `venv/`.
 
 ## Requirements
 
