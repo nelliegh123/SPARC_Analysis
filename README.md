@@ -34,7 +34,7 @@ and plots. Run them from anywhere, e.g. `python analysis/Injections/ToT_vh.py`.
 
 | Script | Plots |
 |---|---|
-| `injection.py` | one setting: ToT histogram and Gaussian fit of a check pixel, bad fits, hitmap, mean ToT map |
+| `injection.py` | one Vh and Vcasb. Plots ToT histogram, Gaussian fit of a check pixel, bad fits, hitmap, mean ToT map |
 | `injection_compare.py` | histograms of hits and mean ToT per pixel for several Vh values in one plot |
 | `ToT_vh.py` | mean ToT vs Vh for all pixels, two highlighted pixels with every hit and a fit |
 | `s_curve.py` | S-curves (hits vs Vh) with an error-function fit: threshold and noise of every pixel |
