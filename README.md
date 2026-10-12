@@ -40,7 +40,6 @@ and plots. Run them from anywhere, e.g. `python analysis/Injections/ToT_vh.py`.
 | `s_curve.py` | S-curves (hits vs Vh) with an error-function fit: threshold and noise of every pixel |
 | `hitmap_tot_vh.py` | Counts- and ToT hitmaps at four Vh values |
 | `bad_pixels.py` | plots hitmap of the pixels with no hits, or no gaussian fit |
-| `hitmap_compare.py` | hitmaps of several data sets next to each other at one Vh |
 | `pixel_fits.py` | ToT histogram and fit of a few chosen pixels |
 | `ToT_vcasb.py` | mean ToT vs Vcasb (old data only) |
 | `Vh.py` | hits vs Vh from the earlier Vh measurements |
