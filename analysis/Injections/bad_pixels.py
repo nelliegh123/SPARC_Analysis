@@ -5,28 +5,22 @@ import numpy as np
 from matplotlib.legend_handler import HandlerTuple
 from matplotlib.patches import Patch, Rectangle
 
-from injection_scan import fit_scan, fit_dataset, PLOT_DIR, NROWS, NCOLS, EXTRA_DATASETS, DATA_VCASB, DATA_VH
+from injection_scan import fit_scan, PLOT_DIR, NROWS, NCOLS, DATA_VCASB, DATA_VH
 
 """
 Shows where the bad pixels are: pixels that have hits but whose ToT histogram can't be fitted with a Gaussian
-(the same definition as in injection.py), and in another color the pixels with fewer than LOW_HITS hits.
-A pixel that is both is drawn half in each color. One heatmap per setting: one figure with a row per Vcasb and a column per Vh,
-and one figure per Vcasb with more Vh values, also for each of the EXTRA_DATASETS in injection_scan.py.
+and in another color the pixels with fewer than LOW_HITS hits.
+A pixel that is both is drawn half in each color. One figure with one heatmap per setting: a row per Vcasb
+and a column per Vh in VH_PLOT.
 """
 
 VCASB_VALUES = [DATA_VCASB]  # the default data only has Vcasb = 300 mV
 VH_PLOT = [75, 300, 600, 1200]  
 
-VH_SINGLE = [50, 75, 100, 200, 400, 1200]
-SINGLE_COLUMNS = 3
-MAP_VH = 800  
 
 
 VH_SCAN = DATA_VH
 
-# For the EXTRA_DATASETS (old data, Ireset = 70 pA, ...): these Vh values plus the highest one that is complete,
-# which is also the Vh of the ToT map and hitmap on the right
-EXTRA_VH_SINGLE = [200, 300, 400, 500, 600]
 
 LOW_HITS = 50 
 
@@ -111,64 +105,14 @@ def plot_bad_pixels(bad, low):
     finish_figure(fig, "Bad pixels", OUTPUT_DIR / f"bad_pixels_overview_vcasb_{'_'.join(map(str, VCASB_VALUES))}.png")
 
 
-#-----One Vcasb scan (Vh values vh_scan), one heatmap per Vh in vh_single in rows of SINGLE_COLUMNS,-----
-#-----and on the right the mean ToT map (top) and the hitmap (bottom) at map_vh-----
-def plot_bad_pixels_single(scan, vcasb, vh_scan, vh_single, map_vh, title, output_file):
-    bad = find_bad_pixels(scan)
-    low = scan["nhits"] < LOW_HITS
-    nrows = max(2, int(np.ceil(len(vh_single) / SINGLE_COLUMNS)))
-    fig, axes = plt.subplots(nrows, SINGLE_COLUMNS + 1, figsize=(4 * (SINGLE_COLUMNS + 1) + 1, 4.6 * nrows),
-                             sharex=True, sharey=True, squeeze=False)
-    for k, ax in enumerate(axes[:, :SINGLE_COLUMNS].ravel()):
-        if k >= len(vh_single):
-            ax.set_visible(False)
-            continue
-        vh = vh_single[k]
-        bad_map = bad[vh_scan.index(vh)]
-        low_map = low[vh_scan.index(vh)]
-        draw_heatmap(ax, bad_map, low_map, f"Vh = {vh} mV")
-        if k // SINGLE_COLUMNS == nrows - 1:
-            ax.set_xlabel("Column")
-        if k % SINGLE_COLUMNS == 0:
-            ax.set_ylabel("Row")
-        print_pixels(vcasb, vh, bad_map, low_map)
-
-    # right column: mean ToT and number of hits of every pixel at map_vh, pixels without a value stay white
-    i = vh_scan.index(map_vh)
-    maps = [(scan["means"][i], "Mean ToT [µs]", f"Mean ToT, Vh = {map_vh} mV"),
-            (np.where(scan["nhits"][i] > 0, scan["nhits"][i], np.nan), "Number of hits", f"Hitmap, Vh = {map_vh} mV")]
-    for row, ax in enumerate(axes[:, -1]):
-        if row >= len(maps):
-            ax.set_visible(False)
-            continue
-        values, label, map_title = maps[row]
-        im = ax.imshow(values, origin="lower", cmap="plasma")
-        fig.colorbar(im, ax=ax, label=label, fraction=0.046, pad=0.04)
-        ax.set_title(map_title)
-        if row == len(maps) - 1:
-            ax.set_xlabel("Column")
-    finish_figure(fig, title, output_file)
-
-
 #-----------Main function where we call everything-----------
 def main():
-    bad, low, scans = {}, {}, {}
+    bad, low = {}, {}
     for vcasb in VCASB_VALUES:
-        scans[vcasb] = fit_scan([(vcasb, vh) for vh in VH_SCAN], f"vcasb_{vcasb}_vh_scan")
-        bad[vcasb] = find_bad_pixels(scans[vcasb])
-        low[vcasb] = scans[vcasb]["nhits"] < LOW_HITS
+        scan = fit_scan([(vcasb, vh) for vh in VH_SCAN], f"vcasb_{vcasb}_vh_scan")
+        bad[vcasb] = find_bad_pixels(scan)
+        low[vcasb] = scan["nhits"] < LOW_HITS
     plot_bad_pixels(bad, low)
-    for vcasb in VCASB_VALUES:
-        plot_bad_pixels_single(scans[vcasb], vcasb, VH_SCAN, VH_SINGLE, MAP_VH, f"Bad pixels, Vcasb = {vcasb} mV",
-                               OUTPUT_DIR / f"bad_pixels_vcasb_{vcasb}.png")
-
-    # the other data sets, each cached under its own name so they don't mix with the standard scans
-    for name, d in EXTRA_DATASETS.items():
-        d["plot_dir"].mkdir(parents=True, exist_ok=True)
-        vh_max = d["vh_scan"][-1]
-        plot_bad_pixels_single(fit_dataset(name), d["vcasb"], d["vh_scan"], EXTRA_VH_SINGLE + [vh_max], vh_max,
-                               f"Bad pixels, {d['label']}, Vcasb = {d['vcasb']} mV",
-                               d["plot_dir"] / f"bad_pixels_{d['tag']}_vcasb_{d['vcasb']}.png")
 
 
 if __name__ == "__main__":

@@ -9,7 +9,7 @@ from matplotlib.patches import Patch
 from injection_scan import fit_scan, fit_dataset, PLOT_DIR, N_INJECTIONS, DATA_VH, EXTRA_DATASETS
 
 """
-Hitmap (top row) and mean ToT map (bottom row) for one Vcasb at a few Vh values.
+Counts hitmap (top row) and ToT hitmap (bottom row) for one Vcasb at a few Vh values.
 """
 
 VCASB = 300
