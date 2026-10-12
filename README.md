@@ -38,7 +38,7 @@ and plots. Run them from anywhere, e.g. `python analysis/Injections/ToT_vh.py`.
 | `injection_compare.py` | histograms of hits and mean ToT per pixel for several Vh values in one plot |
 | `ToT_vh.py` | Plots ToT vs Vh for all pixels, two highlighted pixels with every hit and a fit |
 | `s_curve.py` | S-curves (hits vs Vh) with an error-function fit: threshold and noise of every pixel |
-| `hitmap_tot_vh.py` | hitmaps and mean ToT maps at four Vh values, pixels sorted into colour classes |
+| `hitmap_tot_vh.py` | Counts- and ToT hitmaps at four Vh values |
 | `bad_pixels.py` | where the pixels without a Gaussian fit or with very few hits are |
 | `hitmap_compare.py` | hitmaps of several data sets next to each other at one Vh |
 | `pixel_fits.py` | ToT histogram and fit of a few chosen pixels |
