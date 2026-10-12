@@ -31,10 +31,12 @@ ctrl.constellation.launch()
 ctrl.await_state(SatelliteState.ORBIT, timeout=30)
 
 # Reconfigure output directory
-ctrl.constellation.MessagePackWriter.SPARC.reconfigure({"output_directory": f"/home/teleuser/Nellie/data/{chip}/s_curve"})
+# ctrl.constellation.MessagePackWriter.SPARC.reconfigure({"output_directory": f"/home/teleuser/Nellie/data/{chip}/s_curve_300"})
+ctrl.constellation.MessagePackWriter.SPARC.reconfigure({"output_directory": f"/home/teleuser/Nellie/data/{chip}/s_curve_full"})
 ctrl.await_state(SatelliteState.ORBIT, timeout=5)
 
-def scan_iteration(vcasb: float, vh: float) -> None:
+# cols: the columns to scan, all of them if not given
+def scan_iteration(vcasb: float, vh: float, cols=None) -> None:
     ctrl.log.status(f"Reconfiguring vcasb to {vcasb} mV and vh to {vh} mV")
 
     # Reconfigure
@@ -42,7 +44,7 @@ def scan_iteration(vcasb: float, vh: float) -> None:
     ctrl.constellation.Caribou.SPARC.reconfigure(recfg)
     ctrl.await_state(SatelliteState.ORBIT)
 
-    for col in range(sparc_masking_generator.NCOLS):
+    for col in (range(sparc_masking_generator.NCOLS) if cols is None else cols):
         for row in range(sparc_masking_generator.NROWS):
             ctrl.log.status(f"Reconfiguring active pixel to ({col}, {row})")
 
@@ -83,9 +85,15 @@ def scan_iteration(vcasb: float, vh: float) -> None:
 #    for vh in list(range(25, 225, 25)) + list(range(300, 1300, 100)):
 #        scan_iteration(vcasb, vh)
 
+#-------------S-curve-------------
 for vh in list(range(25, 130, 5)):
-    scan_iteration(180, vh)
+    scan_iteration(300, vh)
+#---------------------------------
 
+# #-------------Rerun of Vh = 900 mV for sparc7: columns 14-18 had ToT about twice too long-------------
+# for vh in [900]:
+#     scan_iteration(300, vh)  # columns 14 to 18
+#-----------------------------------------------------------------------------------------------------
 
 # Land
 ctrl.constellation.land()

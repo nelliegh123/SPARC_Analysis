@@ -6,7 +6,7 @@ import sys
 
 from scipy.optimize import curve_fit
 from injection_scan import (fit_scan, jitter_scatter, load_run, DATA_DIR, PLOT_DIR, NROWS, NCOLS, N_INJECTIONS, DATA_VH,
-                            EXTRA_DATASETS, fit_dataset)
+                            EXTRA_DATASETS, fit_dataset, CHIPS, chip_data_dir, chip_plot_dir)
 
 """
 Plots the ToT vs Vh for a fixed Vcasb.
@@ -16,7 +16,8 @@ and the other data sets in EXTRA_DATASETS in injection_scan.py (old data, Ireset
 """
 
 # On the command line: a Vcasb for the standard data, "python ToT_vh.py 250" (300 if nothing is given),
-# or the name of one of the EXTRA_DATASETS, e.g. "python ToT_vh.py ireset" or "python ToT_vh.py pd250".
+# a chip name for that chip's pulse duration 250 scan, "python ToT_vh.py sparc7",
+# or the name of one of the EXTRA_DATASETS, e.g. "python ToT_vh.py ireset".
 ARG = sys.argv[1] if len(sys.argv) > 1 else "300"
 if ARG in EXTRA_DATASETS:
     DATASET = EXTRA_DATASETS[ARG]
@@ -26,6 +27,14 @@ if ARG in EXTRA_DATASETS:
     SETTINGS = f"{DATASET['label']}, VCASB = {VCASB} mV"
     FILE_TAG = f"{DATASET['tag']}_vcasb_{VCASB}"
     OUTPUT_DIR = DATASET["plot_dir"]
+elif ARG in CHIPS:
+    DATASET = None
+    VCASB = 300
+    VH_VALUES = DATA_VH
+    DATA = chip_data_dir(ARG)
+    SETTINGS = f"{ARG}, VCASB = {VCASB} mV"
+    FILE_TAG = f"vcasb_{VCASB}"
+    OUTPUT_DIR = chip_plot_dir(ARG) / "tot_vh"
 else:
     DATASET = None
     VCASB = int(ARG)
@@ -35,7 +44,6 @@ else:
     FILE_TAG = f"vcasb_{VCASB}"
     OUTPUT_DIR = PLOT_DIR / "tot_vh"
 
-# (6, 6) is near the top of the ToT range of the chip, (10, 19) near the bottom (about 0.7 x the ToT of (6, 6))
 HIGHLIGHT = [(6, 6), (10, 19)]
 DOT_SIZE = 14  # marker size of the "All pixels" dots (one per pixel)
 HIGHLIGHT_COLORS = ["#f5a623", "#d55e00", "#8c3a00"]  # light, dark and darker orange, one per HIGHLIGHT pixel
@@ -126,7 +134,7 @@ def plot_all_pixels(means, all_hits=False):
                 plt.plot(x0 + rng.uniform(-w, w, hits.size), hits, ".", color=color, ms=1.5, mew=0, alpha=0.3,
                          rasterized=True)
             # a legend entry with a visible marker, the hits themselves are tiny and transparent
-            plt.plot([], [], "o", color=color, ms=6, label=f"Pixel ({col}, {row}), all hits")
+            plt.plot([], [], "o", color=color, ms=6, label=f"Pixel ({col}, {row})")
 
         popt = fit_surrogate(vh.astype(float), tot)
         if popt is None:
@@ -145,9 +153,9 @@ def plot_all_pixels(means, all_hits=False):
     plt.xlabel("Vh [mV]")
     plt.ylabel("ToT [µs]" if all_hits else "Mean ToT [µs]")
     title = f"Mean ToT vs VH, pixels with {N_INJECTIONS} +- {HITS_TOLERANCE:.0%} hits" if FULL_HITS_ONLY else "Mean ToT vs VH, all pixels"
-    if all_hits:
-        title = "ToT vs VH: mean ToT of all pixels, every hit of the highlighted pixels"
-    plt.title(f"{title}\n{SETTINGS}")
+    # if all_hits:
+    #     title = "ToT vs VH: mean ToT of all pixels, every hit of the highlighted pixels"
+    # plt.title(f"{title}\n{SETTINGS}")
     # the pixels first, then the fits
     handles, labels = plt.gca().get_legend_handles_labels()
     order = sorted(range(len(labels)), key=lambda k: labels[k].endswith(" fit"))
@@ -163,7 +171,7 @@ def plot_all_pixels(means, all_hits=False):
 
 #-----------Main function where we call everything-----------
 def main():
-    scan = fit_dataset(ARG) if DATASET else fit_scan([(VCASB, vh) for vh in VH_VALUES], f"vcasb_{VCASB}_vh_scan")
+    scan = fit_dataset(ARG) if DATASET else fit_scan([(VCASB, vh) for vh in VH_VALUES], f"vcasb_{VCASB}_vh_scan", data_dir=DATA)
     means, nhits = scan["means"].copy(), scan["nhits"]  # indexed [vh, row, col]
 
     noisy = find_noisy_pixels(nhits)

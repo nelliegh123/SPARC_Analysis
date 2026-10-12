@@ -31,6 +31,18 @@ SCAN_VH = [25, 50, 75, 100, 125, 150, 175, 200, 300, 400, 500, 600, 700, 800, 90
 DATA_VCASB = 300
 DATA_VH = SCAN_VH  
 
+# The pulse duration 250 Vh scan of each chip (Vcasb = 300 mV, the Vh values in DATA_VH), selectable by chip name
+# in the scripts, e.g. "python ToT_vh.py sparc7". Each chip has its data in data/<chip>/injection_pd_250 and its
+# plots in plots/<chip>/.
+CHIPS = ["sparc0", "sparc7"]
+
+def chip_data_dir(chip):
+    return ROOT / "data" / chip / "injection_pd_250"
+
+def chip_plot_dir(chip):
+    return ROOT / "plots" / chip
+
+
 # Older injection data sets, each a Vh scan at one Vcasb in its own folder, selectable in the scripts by name.
 # "vh_scan" lists the Vh values that are complete (see fit_dataset).
 EXTRA_DATASETS = {
@@ -40,6 +52,19 @@ EXTRA_DATASETS = {
                "vh_scan": SCAN_VH, "tag": "ireset_70pA", "plot_dir": OLD_PLOT_DIR / "Ireset70pa"},
 }
 
+
+
+#-------The Vh values of a scan whose pixel files are all there, for a scan that may still be running------
+# A Vh only counts once all NROWS * NCOLS files exist and the newest of them is older than a minute,
+# so a file that is still being written is not read.
+def complete_vh(data_dir, vcasb):
+    import time
+    files = {}
+    for f in Path(data_dir).glob(f"data_run_vcasb_{vcasb}_vh_*_px_*.raw"):
+        vh = int(f.name.split("_vh_")[1].split("_px_")[0])
+        files.setdefault(vh, []).append(f.stat().st_mtime)
+    return sorted(vh for vh, times in files.items()
+                  if len(times) == NROWS * NCOLS and time.time() - max(times) > 60)
 
 
 #-------Reads the raw file and loads hitmap etc------
@@ -119,9 +144,19 @@ def _fit_run(args):
 # "nhits" (hits in the injected pixel), plus "nfiles" [setting] = how many pixel files were found.
 # Results are cached in CACHE_DIR/<name>.npz and reused as long as the settings are the same, so use a
 # different name for data from another data_dir.
+# The cache folder of a data folder: its path below data/, e.g. "sparc7/injection_pd_250", so that the same scan of
+# two chips (data/sparc0/injection_pd_250 and data/sparc7/injection_pd_250) never shares a cache
+def cache_folder(data_dir):
+    data_dir = Path(data_dir).resolve()
+    try:
+        return data_dir.relative_to(ROOT / "data")
+    except ValueError:
+        return Path(*data_dir.parts[-2:])
+
+
 def fit_scan(settings, name, data_dir=DATA_DIR):
     settings = [tuple(s) for s in settings]
-    cache_file = CACHE_DIR / Path(data_dir).name / f"{name}.npz"
+    cache_file = CACHE_DIR / cache_folder(data_dir) / f"{name}.npz"
     if cache_file.exists():
         cache = np.load(cache_file)
         if [tuple(s) for s in cache["settings"].tolist()] == settings:
