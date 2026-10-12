@@ -42,7 +42,6 @@ and plots. Run them from anywhere, e.g. `python analysis/Injections/ToT_vh.py`.
 | `bad_pixels.py` | where the pixels without a Gaussian fit or with very few hits are |
 | `hitmap_compare.py` | hitmaps of several data sets next to each other at one Vh |
 | `pixel_fits.py` | ToT histogram and fit of a few chosen pixels |
-| `weak_pixels.py` | ToT histograms of chosen pixels at a few Vh values |
 | `ToT_vcasb.py` | mean ToT vs Vcasb (old data only) |
 | `Vh.py` | hits vs Vh from the earlier Vh measurements |
 
