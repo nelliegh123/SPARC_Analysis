@@ -9,7 +9,7 @@ import sparc_masking_generator
 # Settings
 config_file_path = "/home/teleuser/Nellie/SPARC.toml"
 group_name = "sparc"
-n_injections = 10000
+n_injections = 25
 pulse_interval = 100e-6
 chip = "sparc7"
 
@@ -31,7 +31,7 @@ ctrl.constellation.launch()
 ctrl.await_state(SatelliteState.ORBIT, timeout=30)
 
 # Reconfigure output directory
-ctrl.constellation.MessagePackWriter.SPARC.reconfigure({"output_directory": f"/home/teleuser/Nellie/data/{chip}/injection_pd_250"})
+ctrl.constellation.MessagePackWriter.SPARC.reconfigure({"output_directory": f"/home/teleuser/Nellie/data/{chip}/s_curve"})
 ctrl.await_state(SatelliteState.ORBIT, timeout=5)
 
 def scan_iteration(vcasb: float, vh: float) -> None:
@@ -67,9 +67,11 @@ def scan_iteration(vcasb: float, vh: float) -> None:
             ctrl.await_state(SatelliteState.ORBIT)
 
 
-# Scan vcasb 300
-for vh in list(range(25, 225, 25)) + list(range(300, 1300, 100)):
-    scan_iteration(300, vh)
+#--------Used this for sparc7-----------
+# # Scan vcasb 300
+# for vh in list(range(25, 225, 25)) + list(range(300, 1300, 100)):
+#     scan_iteration(300, vh)
+#---------------------------------------
 
 # First iteration: fine vcasb scan with nominal vh
 #for vcasb in range(220, 380, 10):
@@ -80,6 +82,10 @@ for vh in list(range(25, 225, 25)) + list(range(300, 1300, 100)):
 #for vcasb in [250, 300]:
 #    for vh in list(range(25, 225, 25)) + list(range(300, 1300, 100)):
 #        scan_iteration(vcasb, vh)
+
+for vh in list(range(25, 130, 5)):
+    scan_iteration(180, vh)
+
 
 # Land
 ctrl.constellation.land()
