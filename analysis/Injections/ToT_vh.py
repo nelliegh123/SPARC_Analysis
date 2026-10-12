@@ -46,8 +46,14 @@ else:
 
 HIGHLIGHT = [(6, 6), (10, 19)]
 DOT_SIZE = 14  # marker size of the "All pixels" dots (one per pixel)
-HIGHLIGHT_COLORS = ["#f5a623", "#d55e00", "#8c3a00"]  # light, dark and darker orange, one per HIGHLIGHT pixel
-FIT_VH_MAX = 1200 #600
+HIGHLIGHT_COLORS = ["#f5a623", "#d55e00", "#8c3a00"]  
+
+# Double pulsing gives extra hits with a ToT of about 0.26-0.5 µs. In the plot with every hit of the HIGHLIGHT pixels,
+# hits shorter than DOUBLE_PULSE_TOT are left out, but only at a Vh where the pixel's median ToT is above
+# CUT_MIN_MEDIAN: close to the threshold the real hits are that short too, so there nothing is cut.
+DOUBLE_PULSE_TOT = 0.6  # µs
+CUT_MIN_MEDIAN = 1.5    # µs
+FIT_VH_MAX = 1200 
 
 # Noisy pixels are found only at VH <= NOISE_VH_MAX: the injection is too small to fire any pixel there,
 # so every hit is noise. At higher VH the cut would instead pick out pixels with a low threshold.
@@ -131,6 +137,11 @@ def plot_all_pixels(means, all_hits=False):
         else:
             for i, (x0, w) in enumerate(zip(vh, half_width)):
                 _, _, hits = load_run(VCASB, x0, col, row, DATA)
+                if hits.size and np.median(hits) > CUT_MIN_MEDIAN:
+                    short = hits < DOUBLE_PULSE_TOT
+                    if short.any():
+                        print(f"px ({col}, {row}) Vh = {x0} mV: {short.sum()} double-pulse hits below {DOUBLE_PULSE_TOT} µs left out")
+                    hits = hits[~short]
                 plt.plot(x0 + rng.uniform(-w, w, hits.size), hits, ".", color=color, ms=1.5, mew=0, alpha=0.3,
                          rasterized=True)
             # a legend entry with a visible marker, the hits themselves are tiny and transparent
