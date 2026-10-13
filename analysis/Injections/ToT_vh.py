@@ -46,7 +46,12 @@ else:
 
 HIGHLIGHT = [(6, 6), (10, 19)]
 DOT_SIZE = 14  # marker size of the "All pixels" dots (one per pixel)
-HIGHLIGHT_COLORS = ["#f5a623", "#d55e00", "#8c3a00"]  
+FONT_SIZE = 13      # size of all text in the plots (matplotlib's default is 10)
+LEGEND_ALPHA = 0.95  # how opaque the legend box is (default 0.8, 1 = not see-through)
+LEGEND_EDGE = "dimgray"
+GRID_ALPHA = 0.6     # how dark the grid lines are (0 = invisible, 1 = full)
+plt.rcParams.update({"font.size": FONT_SIZE})
+HIGHLIGHT_COLORS = ["#e0479e", "#ffc000", "#8c3a00"]  # pink, yellow, brown: one per HIGHLIGHT pixel
 
 # Double pulsing gives extra hits with a ToT of about 0.26-0.5 µs. In the plot with every hit of the HIGHLIGHT pixels,
 # hits shorter than DOUBLE_PULSE_TOT are left out, but only at a Vh where the pixel's median ToT is above
@@ -162,7 +167,7 @@ def plot_all_pixels(means, all_hits=False):
 
     plt.ylim(bottom=0)
     plt.xlabel("Vh [mV]")
-    plt.ylabel("ToT [µs]" if all_hits else "Mean ToT [µs]")
+    plt.ylabel("ToT [µs]" if all_hits else "ToT [µs]")
     title = f"Mean ToT vs VH, pixels with {N_INJECTIONS} +- {HITS_TOLERANCE:.0%} hits" if FULL_HITS_ONLY else "Mean ToT vs VH, all pixels"
     # if all_hits:
     #     title = "ToT vs VH: mean ToT of all pixels, every hit of the highlighted pixels"
@@ -170,8 +175,11 @@ def plot_all_pixels(means, all_hits=False):
     # the pixels first, then the fits
     handles, labels = plt.gca().get_legend_handles_labels()
     order = sorted(range(len(labels)), key=lambda k: labels[k].endswith(" fit"))
-    plt.legend([handles[k] for k in order], [labels[k] for k in order])
-    plt.grid(alpha=0.3)
+    legend = plt.legend([handles[k] for k in order], [labels[k] for k in order], framealpha=LEGEND_ALPHA,
+                        edgecolor=LEGEND_EDGE)
+    for handle in legend.legend_handles:  # full colour in the legend, even though the dots in the plot are see-through
+        handle.set_alpha(1)
+    plt.grid(alpha=GRID_ALPHA)
     output_file = OUTPUT_DIR / f"tot_vs_vh_{FILE_TAG}_all_pixels{TAG}{'_hits' if all_hits else ''}.png"
     plt.savefig(output_file, dpi=150)
     plt.close()

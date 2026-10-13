@@ -7,7 +7,7 @@ from matplotlib.colors import ListedColormap
 from injection_scan import fit_scan, load_run, fit_gaussian, gaussian, tot_bins, PLOT_DIR
 
 Vcasb = 300
-VH = 1200
+VH = 50
 SETTINGS = f"Vcasb = {Vcasb} mV, VH = {VH} mV"
 TAG = f"vcasb_{Vcasb}_vh_{VH}"
 
@@ -145,7 +145,10 @@ def main():
 
     #-Plots one histogram with its Gaussian fit, to check the fit-
     _, _, check_tots = load_run(Vcasb, VH, check_col, check_row)
-    good_hist(check_row, check_col, check_tots, 50)
+    if check_tots.size:
+        good_hist(check_row, check_col, check_tots, 50)
+    else:
+        print(f"WARNING: CHECK_PIXEL ({check_col}, {check_row}) has no hits at VH = {VH} mV, no fit to check")
 
     #-Plots the mean ToT of all pixels as a histogram-
     ToT_hist(tot_means)
@@ -161,14 +164,14 @@ def main():
 
 
 
-    # plt.figure('ToT mean map')
-    # plt.imshow(tot_means, origin='lower', cmap='plasma')
-    # plt.colorbar(label='Mean ToT [µs]')
-    # plt.imshow(np.where(bad_fit, 1.0, np.nan), origin='lower', cmap=ListedColormap(['black']))
-    # plt.xlabel('Column')
-    # plt.ylabel('Row')
-    # plt.title(f'Mean ToT\n{SETTINGS}')
-    # plt.savefig(TOT_DIR / f'tot_mean_map_{TAG}.png', dpi=150)
+    plt.figure('ToT mean map')
+    plt.imshow(tot_means, origin='lower', cmap='plasma')
+    plt.colorbar(label='Mean ToT [µs]')
+    plt.imshow(np.where(bad_fit, 1.0, np.nan), origin='lower', cmap=ListedColormap(['black']))
+    plt.xlabel('Column')
+    plt.ylabel('Row')
+    plt.title(f'Mean ToT\n{SETTINGS}')
+    plt.savefig(TOT_DIR / f'tot_mean_map_{TAG}.png', dpi=150)
     
 
 

@@ -15,13 +15,22 @@ whose pixel files are all there are used, so this also works while a scan is sti
 """
 
 #-----------Settings-----------
-DATA = ROOT / "data" / "sparc7" / "s_curve_fine"     
-OUTPUT_DIR = ROOT / "plots" / "sparc7" / "s_curve"  
+DATA = ROOT / "data" / "sparc0" / "s_curve"     
+OUTPUT_DIR = ROOT / "plots" / "sparc0" / "s_curve"  
 N_INJECTIONS = 1000  
 VH_MAX = 300      
-HIGHLIGHT = [(6, 6), (10, 19)]  # (col, row), the same pixels as in ToT_vh.py
-HIGHLIGHT_COLORS = ["#f5a623", "#d55e00"]
+# The highlighted pixels are picked from the fits: (which pixel, colour, marker of the data points, line style of the fit)
+HIGHLIGHT = [("lowest threshold", "#e0479e", "s", "--"),                      # pink squares, dashed
+             ("average threshold", "#e41a1c", "^", ":"),                      # red triangles, dotted
+             ("highest threshold", "#1a9e3f", "o", (0, (6, 2, 1, 2, 1, 2))),  # green circles, dash-dot-dot
+             ("highest noise", "#ffc000", "D", "-.")]                         # yellow diamonds, dash-dot
+FIT_LINEWIDTH = 2    # line width of the fits of the highlighted pixels
+FONT_SIZE = 13       # size of all text in the plot (matplotlib's default is 10)
+XLIM = (0, 150)      # mV, x range of the plot; None to only show the scanned Vh range
 #------------------------------
+
+
+plt.rcParams.update({"font.size": FONT_SIZE})
 
 
 #-----The Vcasb of the scan-----
@@ -41,8 +50,7 @@ def s_curve(vh, threshold, noise):
 def fit_s_curve(vh, hits):
     ok = ~np.isnan(hits)
     x = vh[ok]
-    # extra hits from double pulsing (a few % above N_INJECTIONS) would pull the fit, so cap at N_INJECTIONS
-    y = np.minimum(hits[ok], N_INJECTIONS)
+    y = hits[ok]
     if y.max() < 0.5 * N_INJECTIONS or y.min() > 0.5 * N_INJECTIONS:
         return np.nan, np.nan
     first_above = x[np.argmax(y >= 0.5 * N_INJECTIONS)]
@@ -53,6 +61,25 @@ def fit_s_curve(vh, hits):
     return popt
 
 
+#-----The (col, row) of each HIGHLIGHT pixel; a pixel is only picked once, otherwise the next one is taken-----
+def pick_pixels(thresholds, noises):
+    ok = ~np.isnan(thresholds)
+    mean_threshold = np.mean(thresholds[ok])
+    order = {"lowest threshold": thresholds,
+             "average threshold": np.abs(thresholds - mean_threshold),
+             "highest threshold": -thresholds,
+             "highest noise": -noises}
+    picked = []
+    for which, *_ in HIGHLIGHT:
+        values = np.where(ok, order[which], np.inf)
+        for flat in np.argsort(values, axis=None):
+            row, col = np.unravel_index(flat, values.shape)
+            if (col, row) not in picked:
+                picked.append((int(col), int(row)))
+                break
+    return picked
+
+
 #-----------All S-curves on top of each other, the HIGHLIGHT pixels with their fit------------
 def plot_s_curves(vh, hits, thresholds, noises, title, output_file):
     plt.figure('S-curves', figsize=(9, 6))
@@ -60,23 +87,66 @@ def plot_s_curves(vh, hits, thresholds, noises, title, output_file):
         for col in range(NCOLS):
             plt.plot(vh, hits[:, row, col], color='#2a9df4', linewidth=0.5, alpha=0.3,
                      label='All pixels' if (row, col) == (0, 0) else None)
-    x_fit = np.linspace(0, vh.max(), 500)
-    for (col, row), color in zip(HIGHLIGHT, HIGHLIGHT_COLORS):
-        plt.plot(vh, hits[:, row, col], 'o', color=color, ms=6, label=f'Pixel ({col}, {row})')
+    x_lo, x_hi = XLIM if XLIM else (vh.min(), vh.max())
+    x_fit = np.linspace(x_lo, x_hi, 500)  # the fits are drawn over the whole x range
+    for (which, color, marker, linestyle), (col, row) in zip(HIGHLIGHT, pick_pixels(thresholds, noises)):
         thr, noise = thresholds[row, col], noises[row, col]
-        if not np.isnan(thr):
-            plt.plot(x_fit, s_curve(x_fit, thr, noise), '-', color=color, linewidth=1.5,
-                     label=f'Pixel ({col}, {row}) fit: threshold {thr:.0f} mV, noise {noise:.1f} mV')
-    plt.axhline(N_INJECTIONS, color='black', linestyle='--', linewidth=1, label=f'{N_INJECTIONS} injections')
-    plt.axhline(0.5 * N_INJECTIONS, color='gray', linestyle=':', linewidth=1, label='50 % (threshold)')
-    plt.xlim(0, vh.max())
+        plt.plot(vh, hits[:, row, col], marker, color=color, ms=7,
+                 label=f'Pixel ({col}, {row}), {which}')
+        plt.plot(x_fit, s_curve(x_fit, thr, noise), linestyle=linestyle, color=color, linewidth=FIT_LINEWIDTH,
+                 label=f'Pixel ({col}, {row}) fit: $\\mu$ = {thr:.1f} mV, $\\sigma$ = {noise:.1f} mV')
+        print(f"{which}: pixel ({col}, {row}), threshold {thr:.1f} mV, noise {noise:.1f} mV")
+    plt.axhline(0.5 * N_INJECTIONS, color='gray', linestyle=':', linewidth=1)    # 50 %, the threshold
+    plt.xlim(x_lo, x_hi)
     plt.xlabel('Vh [mV]')
-    plt.ylabel('Number of hits')
-    plt.title(title)
-    plt.legend(loc='center right', fontsize=8)
+    plt.ylabel('Hits')
+    plt.ylim(0, 1050)
+
+    # the legend outside the plot, to the right of it and centred vertically
+    legend = plt.legend(loc='center left', bbox_to_anchor=(1.02, 0.5), borderaxespad=0, framealpha=0.95, edgecolor='dimgray')
+    for handle in legend.legend_handles:  # full colour in the legend, even though the S-curves are see-through
+        handle.set_alpha(1)
     plt.grid(alpha=0.3)
-    plt.savefig(output_file, dpi=150)
+    plt.savefig(output_file, dpi=150, bbox_inches='tight')  # 'tight' so the legend outside isn't cut off
     plt.close()
+    print(f"Saved {output_file}")
+
+
+#-----------Map of the chip (column vs row) with one value of every pixel (threshold or noise) as colour------------
+def plot_map(values, label, output_file):
+    cmap = plt.get_cmap("plasma").copy()
+    cmap.set_bad("lightgray")  # pixels without an S-curve fit
+    plt.figure("Map", figsize=(7, 7))
+    im = plt.imshow(values, origin="lower", cmap=cmap)
+    plt.colorbar(im, label=label, fraction=0.046, pad=0.04)
+    plt.xlabel("Column")
+    plt.ylabel("Row")
+    plt.savefig(output_file, dpi=150, bbox_inches="tight")
+    plt.close()
+    print(f"Saved {output_file}")
+
+
+#-----------Histograms of the threshold and the noise of all pixels, next to each other------------
+def plot_histograms(thresholds, noises, output_file):
+    fig, axes = plt.subplots(1, 2, figsize=(13, 5))
+    # (axis, values, x label, bin width in mV)
+    for ax, values, label, width in ((axes[0], thresholds, r"Threshold $\mu$ [mV]", 1.5),
+                                     (axes[1], noises, r"Noise $\sigma$ [mV]", 0.15)):
+        values = values[~np.isnan(values)]
+        edges = np.arange(np.floor(values.min() / width) * width, values.max() + width, width)
+        # filled histogram without gaps between the bins, with a darker outline
+        ax.hist(values, edges, histtype="stepfilled", color="#2a9df4", alpha=0.35)
+        ax.hist(values, edges, histtype="step", color="#2a78d6", linewidth=1.5)
+        ax.text(0.97, 0.95, f"mean {np.mean(values):.1f} mV", transform=ax.transAxes,
+                ha="right", va="top", bbox=dict(boxstyle="round", facecolor="white", edgecolor="dimgray", alpha=0.95))
+        ax.set_xlabel(label)
+        ax.set_ylabel("Counts")
+        ax.set_ylim(bottom=0)
+        ax.grid(alpha=0.3)
+        ax.set_axisbelow(True)  # grid behind the histogram
+    fig.tight_layout()
+    fig.savefig(output_file, dpi=150)
+    plt.close(fig)
     print(f"Saved {output_file}")
 
 
@@ -109,6 +179,10 @@ def main():
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     title = f"S-curves, all pixels\n{DATA.parent.name}/{DATA.name}, Vcasb = {vcasb} mV, {N_INJECTIONS} injections per pixel"
     plot_s_curves(vh, hits, thresholds, noises, title, OUTPUT_DIR / f"s_curves_{DATA.name}_vcasb_{vcasb}.png")
+    tag = f"{DATA.name}_vcasb_{vcasb}"
+    plot_map(thresholds, r"Threshold $\mu$ [mV]", OUTPUT_DIR / f"threshold_map_{tag}.png")
+    plot_map(noises, r"Noise $\sigma$ [mV]", OUTPUT_DIR / f"noise_map_{tag}.png")
+    plot_histograms(thresholds, noises, OUTPUT_DIR / f"threshold_noise_hist_{tag}.png")
 
 
 if __name__ == "__main__":

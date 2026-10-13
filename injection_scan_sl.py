@@ -10,7 +10,8 @@ import sparc_masking_generator
 config_file_path = "/home/teleuser/Nellie/SPARC.toml"
 group_name = "sparc"
 n_injections = 1000
-pulse_interval = 100e-6
+pulse_interval = 100e-3 #100 ms        #100e-6 #100 mu s
+
 chip = "sparc7"
 
 # Create controller
@@ -32,7 +33,7 @@ ctrl.await_state(SatelliteState.ORBIT, timeout=30)
 
 # Reconfigure output directory
 # ctrl.constellation.MessagePackWriter.SPARC.reconfigure({"output_directory": f"/home/teleuser/Nellie/data/{chip}/s_curve_300"})
-ctrl.constellation.MessagePackWriter.SPARC.reconfigure({"output_directory": f"/home/teleuser/Nellie/data/{chip}/s_curve_fine"})
+ctrl.constellation.MessagePackWriter.SPARC.reconfigure({"output_directory": f"/home/teleuser/Nellie/data/{chip}/double_pulsing"})
 ctrl.await_state(SatelliteState.ORBIT, timeout=5)
 
 # cols: the columns to scan, all of them if not given
@@ -88,7 +89,7 @@ def scan_iteration(vcasb: float, vh: float, cols=None) -> None:
 
 #-------------S-curve-------------
 # 45, 50 and 55 mV are already done (data/sparc7/s_curve_fine), so this resumes at 60 mV
-for vh in list(range(60, 130, 5)):
+for vh in list(range(45, 130, 5)):
     scan_iteration(300, vh)
 
 # Later: fill in the 2.5 mV points over the transition region (57.5-112.5 mV)

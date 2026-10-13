@@ -13,7 +13,7 @@ Counts hitmap (top row) and ToT hitmap (bottom row) for one Vcasb at a few Vh va
 """
 
 VCASB = 300
-HITS_TOLERANCE = 5  # a pixel with 10000 +- HITS_TOLERANCE hits counts as having all its hits
+HITS_TOLERANCE = 250  # a pixel with 10000 +- HITS_TOLERANCE hits counts as having all its hits
 
 HIT_CLASSES = ["No hits", f"Fewer than {N_INJECTIONS - HITS_TOLERANCE}",
                f"{N_INJECTIONS} $\\pm$ {HITS_TOLERANCE}", f"More than {N_INJECTIONS + HITS_TOLERANCE}"]
@@ -24,7 +24,7 @@ TOT_COLORS = ["white", "#3c096c", "#9d4edd", "#f6d32d", "#f77f00", "black"]
 TOT_SHORT = [f"< {TOT_EDGES[0]:g}"] + [f"{lo:g}-{hi:g}" for lo, hi in zip(TOT_EDGES, TOT_EDGES[1:])] + [f"> {TOT_EDGES[-1]:g}"]
 TOT_CLASSES = ["No fit"] + [f"{band} µs" for band in TOT_SHORT]
 
-VH_VALUES_WANTED = [600, 800, 1000, 1200]
+VH_VALUES_WANTED = [100, 150, 200, 300]
 
 DATASET = sys.argv[1] if len(sys.argv) > 1 else "standard"
 if DATASET == "standard":
