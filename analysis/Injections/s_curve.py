@@ -15,9 +15,9 @@ whose pixel files are all there are used, so this also works while a scan is sti
 """
 
 #-----------Settings-----------
-DATA = ROOT / "data" / "sparc7" / "s_curve_full"     
+DATA = ROOT / "data" / "sparc7" / "s_curve_fine"     
 OUTPUT_DIR = ROOT / "plots" / "sparc7" / "s_curve"  
-N_INJECTIONS = 25  
+N_INJECTIONS = 1000  
 VH_MAX = 300      
 HIGHLIGHT = [(6, 6), (10, 19)]  # (col, row), the same pixels as in ToT_vh.py
 HIGHLIGHT_COLORS = ["#f5a623", "#d55e00"]

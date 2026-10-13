@@ -61,15 +61,23 @@ def complete_vh(data_dir, vcasb):
     import time
     files = {}
     for f in Path(data_dir).glob(f"data_run_vcasb_{vcasb}_vh_*_px_*.raw"):
-        vh = int(f.name.split("_vh_")[1].split("_px_")[0])
+        vh = vh_from_name(f.name.split("_vh_")[1].split("_px_")[0])
         files.setdefault(vh, []).append(f.stat().st_mtime)
     return sorted(vh for vh, times in files.items()
                   if len(times) == NROWS * NCOLS and time.time() - max(times) > 60)
 
 
+#-------Vh in file names: run identifiers can't contain ".", so 57.5 mV is written as 57p5------
+def vh_from_name(text):
+    return float(text.replace("p", ".")) if "p" in text else int(text)
+
+def vh_to_name(vh):
+    return str(vh).replace(".", "p")
+
+
 #-------Reads the raw file and loads hitmap etc------
 def raw_file(vcasb, vh, col, row, data_dir=DATA_DIR):
-    return Path(data_dir) / f"data_run_vcasb_{vcasb}_vh_{vh}_px_{col}_{row}.raw"
+    return Path(data_dir) / f"data_run_vcasb_{vcasb}_vh_{vh_to_name(vh)}_px_{col}_{row}.raw"
 
 def load_run(vcasb, vh, col, row, data_dir=DATA_DIR):
     analyzer = SPARCAnalyser(raw_file(vcasb, vh, col, row, data_dir))
