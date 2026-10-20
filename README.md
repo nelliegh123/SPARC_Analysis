@@ -50,7 +50,7 @@ The default data is the Vh scan in `data/sparc0/injection_pd_250`, set as `DATA_
 Its plots go to `plots/Injections/<plot type>/`.
 
 Older data sets are listed in `EXTRA_DATASETS` in `injection_scan.py` and can be chosen by name on the
-command line, e.g. `python analysis/Injections/ToT_vh.py ireset`:
+command line, e.g. `python analysis/Injections/hitmap_tot_vh.py ireset`:
 
 | Name | Data | Plots |
 |---|---|---|

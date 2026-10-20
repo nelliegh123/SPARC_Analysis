@@ -1,4 +1,5 @@
 import time
+from collections.abc import Sequence
 
 from constellation.core.controller import ScriptableController
 from constellation.core.controller_configuration import load_config
@@ -9,10 +10,12 @@ import sparc_masking_generator
 # Settings
 config_file_path = "/home/teleuser/Nellie/SPARC.toml"
 group_name = "sparc"
-n_injections = 1000
-pulse_interval = 100e-3 #100 ms        #100e-6 #100 mu s
+n_injections = 10000
+pulse_interval = 100e-6 # 100us
 
 chip = "sparc7"
+cols = range(sparc_masking_generator.NCOLS)  # [6]
+rows = range(sparc_masking_generator.NROWS)  # [6]
 
 # Create controller
 ctrl = ScriptableController(group_name)
@@ -32,12 +35,11 @@ ctrl.constellation.launch()
 ctrl.await_state(SatelliteState.ORBIT, timeout=30)
 
 # Reconfigure output directory
-# ctrl.constellation.MessagePackWriter.SPARC.reconfigure({"output_directory": f"/home/teleuser/Nellie/data/{chip}/s_curve_300"})
-ctrl.constellation.MessagePackWriter.SPARC.reconfigure({"output_directory": f"/home/teleuser/Nellie/data/{chip}/double_pulsing"})
+ctrl.constellation.MessagePackWriter.SPARC.reconfigure({"output_directory": f"/home/teleuser/Nellie/data/{chip}/injection_pd_8k_ireset_10pA"})
 ctrl.await_state(SatelliteState.ORBIT, timeout=5)
 
-# cols: the columns to scan, all of them if not given
-def scan_iteration(vcasb: float, vh: float, cols=None) -> None:
+# Scan iteration
+def scan_iteration(vcasb: float, vh: float, cols: Sequence[int] = cols, rows: Sequence[int] = rows) -> None:
     ctrl.log.status(f"Reconfiguring vcasb to {vcasb} mV and vh to {vh} mV")
 
     # Reconfigure
@@ -45,8 +47,8 @@ def scan_iteration(vcasb: float, vh: float, cols=None) -> None:
     ctrl.constellation.Caribou.SPARC.reconfigure(recfg)
     ctrl.await_state(SatelliteState.ORBIT)
 
-    for col in (range(sparc_masking_generator.NCOLS) if cols is None else cols):
-        for row in range(sparc_masking_generator.NROWS):
+    for col in cols:
+        for row in rows:
             ctrl.log.status(f"Reconfiguring active pixel to ({col}, {row})")
 
             # Reconfigure
@@ -55,7 +57,6 @@ def scan_iteration(vcasb: float, vh: float, cols=None) -> None:
             ctrl.await_state(SatelliteState.ORBIT)
 
             # Start the run
-            # Constellation only allows [A-Za-z0-9_-] in run identifiers, so 57.5 mV is written as 57p5
             run_identifier = f"run_vcasb_{vcasb}_vh_{str(vh).replace('.', 'p')}_px_{col}_{row}"
             ctrl.log.status(f"Starting run {run_identifier}")
             ctrl.constellation.start(run_identifier)
@@ -77,30 +78,29 @@ def scan_iteration(vcasb: float, vh: float, cols=None) -> None:
 #     scan_iteration(300, vh)
 #---------------------------------------
 
-# First iteration: fine vcasb scan with nominal vh
-#for vcasb in range(220, 380, 10):
-#    if vcasb not in [250, 300]:
-#        scan_iteration(vcasb, 600)
-
-# Second iteration: fine vh scan with a few vcasb values
+# First iteration: fine vh scan with a few vcasb values
 #for vcasb in [250, 300]:
 #    for vh in list(range(25, 225, 25)) + list(range(300, 1300, 100)):
 #        scan_iteration(vcasb, vh)
 
+# Second iteration: fine vcasb scan with nominal vh
+#for vcasb in range(220, 380, 10):
+#    if vcasb not in [250, 300]:
+#        scan_iteration(vcasb, 600)
+
 #-------------S-curve-------------
-# 45, 50 and 55 mV are already done (data/sparc7/s_curve_fine), so this resumes at 60 mV
-for vh in list(range(45, 130, 5)):
-    scan_iteration(300, vh)
+# for vh in list(range(45, 130, 5)):
+#     scan_iteration(300, vh)
 
 # Later: fill in the 2.5 mV points over the transition region (57.5-112.5 mV)
 # for vh in [x / 2 for x in range(115, 230, 10)]:
 #     scan_iteration(300, vh)
 #---------------------------------
 
-# #-------------Rerun of Vh = 900 mV for sparc7: columns 14-18 had ToT about twice too long-------------
-# for vh in [900]:
-#     scan_iteration(300, vh)  # columns 14 to 18
-#-----------------------------------------------------------------------------------------------------
+
+for vcasn in list(range(150, 460, 100)):
+    scan_iteration(300, vcasn)
+
 
 # Land
 ctrl.constellation.land()

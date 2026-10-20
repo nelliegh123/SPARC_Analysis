@@ -27,6 +27,7 @@ type = "SPARC"
 
 # Chip voltages and currents
 vcasb = 0.300
+#vreset = 0.0177 # => 6pA pixel
 vreset = 0.116 # => 10pA pixel
 #vreset = 1.42 # => 70pA pixel
 vh = 0.600
@@ -34,7 +35,8 @@ vh = 0.600
 [Caribou.SPARC.devices.SPARC.memories]
 ro_busy_until_fifo_empty = 1
 
-pulse_duration = 250      #1 micro second
+#pulse_duration = 250 # => 1us
+pulse_duration = 8000 # => 32us
 
 [Caribou.SPARC.devices.SPARC.registers]
 # Acqusition + ToT mode

@@ -16,8 +16,8 @@ from analyze_data_sl_tot import SPARCAnalyser
 
 ROOT = Path(__file__).resolve().parents[2] 
 # Default data: the Vh scan with pulse duration = 250 (SPARC.toml, run with injection_scan_sl.py), only Vcasb = 300 mV, complete up to DATA_VH[-1]
-DATA_DIR = ROOT / "data" / "sparc0" / "injection_pd_250"
-PLOT_DIR = ROOT / "plots" / "sparc0" 
+DATA_DIR = ROOT / "data" / "sparc7" / "injection_pd_8k_ireset_10pA"
+PLOT_DIR = ROOT / "plots" / "sparc7" 
 
 OLD_PLOT_DIR = ROOT / "plots" / "WrongInjections" 
 CACHE_DIR = ROOT / "cache"  
@@ -31,9 +31,8 @@ SCAN_VH = [25, 50, 75, 100, 125, 150, 175, 200, 300, 400, 500, 600, 700, 800, 90
 DATA_VCASB = 300
 DATA_VH = SCAN_VH  
 
-# The pulse duration 250 Vh scan of each chip (Vcasb = 300 mV, the Vh values in DATA_VH), selectable by chip name
-# in the scripts, e.g. "python ToT_vh.py sparc7". Each chip has its data in data/<chip>/injection_pd_250 and its
-# plots in plots/<chip>/.
+# The pulse duration 250 Vh scan of each chip (Vcasb = 300 mV, the Vh values in DATA_VH).
+# Each chip has its data in data/<chip>/injection_pd_250 and its plots in plots/<chip>/.
 CHIPS = ["sparc0", "sparc7"]
 
 def chip_data_dir(chip):
