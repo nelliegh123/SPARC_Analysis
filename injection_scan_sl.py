@@ -35,7 +35,7 @@ ctrl.constellation.launch()
 ctrl.await_state(SatelliteState.ORBIT, timeout=30)
 
 # Reconfigure output directory
-ctrl.constellation.MessagePackWriter.SPARC.reconfigure({"output_directory": f"/home/teleuser/Nellie/data/{chip}/injection_pd_8k_ireset_10pA"})
+ctrl.constellation.MessagePackWriter.SPARC.reconfigure({"output_directory": f"/home/teleuser/Nellie/data/{chip}/injection_pd_8k_ireset_10pA_ToT_off"})
 ctrl.await_state(SatelliteState.ORBIT, timeout=5)
 
 # Scan iteration
@@ -98,9 +98,10 @@ def scan_iteration(vcasb: float, vh: float, cols: Sequence[int] = cols, rows: Se
 #---------------------------------
 
 
-for vcasn in list(range(150, 460, 100)):
-    scan_iteration(300, vcasn)
+# for vcasn in list(range(150, 460, 100)):
+#     scan_iteration(300, vcasn)
 
+scan_iteration(300, 600)
 
 # Land
 ctrl.constellation.land()

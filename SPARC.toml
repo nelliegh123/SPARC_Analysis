@@ -41,7 +41,7 @@ pulse_duration = 8000 # => 32us
 [Caribou.SPARC.devices.SPARC.registers]
 # Acqusition + ToT mode
 conf_acq_mode = 0 # 0 is matrix, 1 is fastOR only (broken?), 2 matrix+fastOR
-conf_tot_disable = 0 # 0 is with ToT, 1 is without ToT
+conf_tot_disable = 1 # 0 is with ToT, 1 is without ToT
 
 # Injection
 conf_pulse_mode = 1 # 0 is digital, 1 is analog
