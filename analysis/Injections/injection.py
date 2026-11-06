@@ -1,10 +1,10 @@
 import matplotlib
-matplotlib.use("Agg")  
+# matplotlib.use("Agg")  # file-only backend: uncomment to only save plots without opening windows
 import matplotlib.pyplot as plt
 import numpy as np
 from matplotlib.colors import ListedColormap
 
-from injection_scan import fit_scan, load_run, fit_gaussian, gaussian, tot_bins, PLOT_DIR
+from injection_scan import fit_scan, load_run, fit_gaussian, gaussian, tot_bins, ROOT
 
 Vcasb = 300
 VH = 50
@@ -14,6 +14,8 @@ TAG = f"vcasb_{Vcasb}_vh_{VH}"
 CHECK_PIXEL = (6, 6)  #(col, row) of a good pixel
 ONE_BAD_FIT = False    #True: plot the histogram of only the first bad pixel. False: of all of them
 
+DATA = ROOT / "data" / "sparc7" / "injection_pd_8k_ireset_10pA"
+PLOT_DIR = ROOT / "plots" / "sparc7" / "TEST"
 COUNTS_DIR = PLOT_DIR / "counts_hitmap"  
 TOT_DIR = PLOT_DIR / "tot_hitmap"       
 COUNTS_DIR.mkdir(parents=True, exist_ok=True)
@@ -45,6 +47,7 @@ def bad_hist(row, col, values, bins=50):
     plt.ylabel('Counts')
     plt.title(f'Pixel ({col}, {row}) ToT histogram\n{SETTINGS}')
     plt.savefig(TOT_DIR / 'bad_fits' / f'tot_histogram_{TAG}_px_{col}_{row}.png', dpi=150)
+    plt.show()
     plt.close()
 
 
@@ -65,6 +68,7 @@ def good_hist(row, col, values, bins=50):
         plt.legend()
     plt.title(f'Pixel ({col}, {row}) ToT histogram\n{SETTINGS}')
     plt.savefig(TOT_DIR / 'good_fits' / f'tot_histogram_{TAG}_px_{col}_{row}.png', dpi=150)
+    plt.show()
     plt.close()
 
 
@@ -87,6 +91,7 @@ def plot_tot_lego(tot_means):
     ax.set_title(f"Mean ToT\n{SETTINGS}")
     output_file = TOT_DIR / f"tot_mean_lego_{TAG}.png"
     fig.savefig(output_file, dpi=150, bbox_inches="tight")
+    plt.show()
     plt.close(fig)
     print(f"Saved {output_file}")
 
@@ -100,6 +105,7 @@ def plot_hits(nhits):
     plt.title(f'Number of hits per pixel\n{SETTINGS}')
     output_file = COUNTS_DIR / f'hits_hist_{TAG}.png'
     plt.savefig(output_file, dpi=150)
+    plt.show()
     plt.close()
     print(f"Saved {output_file}")
 
@@ -117,6 +123,7 @@ def ToT_hist(tot_means, bins=25):
     plt.title(f'Mean ToT of all pixels ({values.size} pixels)\n{SETTINGS}')
     output_file = TOT_DIR / f'tot_mean_hist_{TAG}.png'
     plt.savefig(output_file, dpi=150)
+    plt.show()
     plt.close()
     print(f"Saved {output_file}")
 
@@ -125,7 +132,7 @@ def ToT_hist(tot_means, bins=25):
 
 #-----------Main function where we call everything-----------
 def main():
-    scan = fit_scan([(Vcasb, VH)], f"vcasb_{Vcasb}_vh_{VH}")
+    scan = fit_scan([(Vcasb, VH)], f"vcasb_{Vcasb}_vh_{VH}", data_dir=DATA)
     tot_means = scan["means"][0]  # indexed [row, col]
 
     #-Pixels with hits but no Gaussian fit are shown in green-
@@ -138,13 +145,13 @@ def main():
         print(f"WARNING: bad ToT fit for px ({col}, {row})")
         if (ONE_BAD_FIT and n_plotted == 1) or (col, row) == (check_col, check_row):
             continue
-        _, _, tots = load_run(Vcasb, VH, col, row)
+        _, _, tots = load_run(Vcasb, VH, col, row, DATA)
         #-Plots the bad ToT histogram for this pixel-
         bad_hist(row, col, tots, 50)
         n_plotted += 1
 
     #-Plots one histogram with its Gaussian fit, to check the fit-
-    _, _, check_tots = load_run(Vcasb, VH, check_col, check_row)
+    _, _, check_tots = load_run(Vcasb, VH, check_col, check_row, DATA)
     if check_tots.size:
         good_hist(check_row, check_col, check_tots, 50)
     else:

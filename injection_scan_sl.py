@@ -13,7 +13,7 @@ group_name = "sparc"
 n_injections = 10000
 pulse_interval = 100e-6 # 100us
 
-chip = "sparc7"
+chip = "sparc6"
 cols = range(sparc_masking_generator.NCOLS)  # [6]
 rows = range(sparc_masking_generator.NROWS)  # [6]
 
@@ -24,7 +24,7 @@ ctrl = ScriptableController(group_name)
 cfg = load_config(config_file_path)
 
 # Wait until all satellites are connected
-ctrl.await_satellites(["MessagePackWriter.SPARC", "Keithley.Bias", "Caribou.SPARC"])
+ctrl.await_satellites(["MessagePackWriter.SPARC", "Keithley.Bias", "Caribou.SPARC", "Influx.DB"])
 
 # Initialize
 ctrl.constellation.initialize(cfg)
@@ -35,15 +35,15 @@ ctrl.constellation.launch()
 ctrl.await_state(SatelliteState.ORBIT, timeout=30)
 
 # Reconfigure output directory
-ctrl.constellation.MessagePackWriter.SPARC.reconfigure({"output_directory": f"/home/teleuser/Nellie/data/{chip}/injection_pd_8k_ireset_10pA_ToT_off"})
+ctrl.constellation.MessagePackWriter.SPARC.reconfigure({"output_directory": f"/home/teleuser/Nellie/data/{chip}/iron55/injection"})
 ctrl.await_state(SatelliteState.ORBIT, timeout=5)
 
 # Scan iteration
-def scan_iteration(vcasb: float, vh: float, cols: Sequence[int] = cols, rows: Sequence[int] = rows) -> None:
-    ctrl.log.status(f"Reconfiguring vcasb to {vcasb} mV and vh to {vh} mV")
+def scan_iteration(vcasb: float, vh: float, vcasn: float, idb: float, cols: Sequence[int] = cols, rows: Sequence[int] = rows) -> None:
+    ctrl.log.status(f"Reconfiguring vcasb to {vcasb} mV and vh to {vh} mV and vcasn to {vcasn} mV and Idb to {idb*10} nA")
 
     # Reconfigure
-    recfg = {"devices": {"SPARC": {"vcasb": vcasb*1e-3, "vh": vh*1e-3}}}
+    recfg = {"devices": {"SPARC": {"resources": {"vcasb": vcasb*1e-3, "vh": vh*1e-3, "vcasn": vcasn*1e-3}}}}
     ctrl.constellation.Caribou.SPARC.reconfigure(recfg)
     ctrl.await_state(SatelliteState.ORBIT)
 
@@ -57,7 +57,7 @@ def scan_iteration(vcasb: float, vh: float, cols: Sequence[int] = cols, rows: Se
             ctrl.await_state(SatelliteState.ORBIT)
 
             # Start the run
-            run_identifier = f"run_vcasb_{vcasb}_vh_{str(vh).replace('.', 'p')}_px_{col}_{row}"
+            run_identifier = f"vcasb{vcasb}_vh{vh}_vcasn_{vcasn}_idb_{idb*10}_px_{col}_{row}"
             ctrl.log.status(f"Starting run {run_identifier}")
             ctrl.constellation.start(run_identifier)
             ctrl.await_state(SatelliteState.RUN)
@@ -97,11 +97,10 @@ def scan_iteration(vcasb: float, vh: float, cols: Sequence[int] = cols, rows: Se
 #     scan_iteration(300, vh)
 #---------------------------------
 
+for idb in range(1, 52, 25):
+    scan_iteration(300, 600, 300, idb)
 
-# for vcasn in list(range(150, 460, 100)):
-#     scan_iteration(300, vcasn)
 
-scan_iteration(300, 600)
 
 # Land
 ctrl.constellation.land()

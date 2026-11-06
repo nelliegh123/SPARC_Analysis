@@ -5,7 +5,7 @@ import numpy as np
 from scipy.optimize import curve_fit
 from scipy.special import erf
 
-from injection_scan import fit_scan, complete_vh, ROOT, NROWS, NCOLS
+from injection_scan import fit_scan, ROOT, NROWS, NCOLS
 
 """
 S-curves: the number of hits of every pixel vs the injection voltage Vh, around the threshold.
@@ -40,12 +40,12 @@ def find_vcasb():
     return vcasbs.pop()
 
 
-#-----S-curve: 0 hits far below the threshold, N_INJECTIONS far above it-----
+#-----S-curve: fit-----
 def s_curve(vh, threshold, noise):
     return 0.5 * N_INJECTIONS * (1 + erf((vh - threshold) / (np.sqrt(2) * noise)))
 
 
-# Fits one pixel's hits vs Vh. Returns (threshold, noise) in mV, or (nan, nan) if the pixel never crosses 50 %.
+# Fits one pixel's counts vs Vh. Returns (threshold, noise) in mV, or (nan, nan) if the pixel never crosses 50 %.
 def fit_s_curve(vh, hits):
     ok = ~np.isnan(hits)
     x = vh[ok]
@@ -79,16 +79,16 @@ def pick_pixels(thresholds, noises):
     return picked
 
 
-#-----------All S-curves on top of each other, the HIGHLIGHT pixels with their fit------------
+#-----------Plots all normalized S-curves on top of each other, and 4 pixels with their fit------------
 def plot_s_curves(vh, hits, thresholds, noises, title, output_file):
-    hits = hits / N_INJECTIONS  # plotted as the fraction of the injections that gave a hit, the fits scaled the same way
+    hits = hits / N_INJECTIONS  
     plt.figure('S-curves', figsize=(9, 6))
     for row in range(NROWS):
         for col in range(NCOLS):
             plt.plot(vh, hits[:, row, col], color='#2a9df4', linewidth=0.5, alpha=0.3,
                      label='All pixels' if (row, col) == (0, 0) else None)
     x_lo, x_hi = XLIM if XLIM else (vh.min(), vh.max())
-    x_fit = np.linspace(x_lo, x_hi, 500)  # the fits are drawn over the whole x range
+    x_fit = np.linspace(x_lo, x_hi, 500)  
     for (which, color, marker, linestyle), (col, row) in zip(HIGHLIGHT, pick_pixels(thresholds, noises)):
         thr, noise = thresholds[row, col], noises[row, col]
         plt.plot(vh, hits[:, row, col], marker, color=color, ms=7,
@@ -102,12 +102,12 @@ def plot_s_curves(vh, hits, thresholds, noises, title, output_file):
     plt.ylabel('Normalized counts')
     plt.ylim(0, 1.05)
 
-    # the legend outside the plot, to the right of it and centred vertically
+    # the legend outside the plot
     legend = plt.legend(loc='center left', bbox_to_anchor=(1.02, 0.5), borderaxespad=0, framealpha=0.95, edgecolor='dimgray')
     for handle in legend.legend_handles:  # full colour in the legend, even though the S-curves are see-through
         handle.set_alpha(1)
     plt.grid(alpha=0.3)
-    plt.savefig(output_file, dpi=150, bbox_inches='tight')  # 'tight' so the legend outside isn't cut off
+    plt.savefig(output_file, dpi=150, bbox_inches='tight') 
     plt.close()
     print(f"Saved {output_file}")
 
@@ -143,7 +143,7 @@ def plot_histograms(thresholds, noises, output_file):
         ax.set_ylabel("Counts")
         ax.set_ylim(bottom=0)
         ax.grid(alpha=0.3)
-        ax.set_axisbelow(True)  # grid behind the histogram
+        ax.set_axisbelow(True)  
     fig.tight_layout()
     fig.savefig(output_file, dpi=150)
     plt.close(fig)
@@ -183,10 +183,11 @@ def plot_noise_even_odd(noises, output_file, width=0.15):
 #-----------Main function where we call everything-----------
 def main():
     vcasb = find_vcasb()
-    vh_values = [vh for vh in complete_vh(DATA, vcasb) if vh <= VH_MAX]
+    vh_values = sorted({int(f.name.split("_vh_")[1].split("_px_")[0]) for f in DATA.glob(f"data_run_vcasb_{vcasb}_vh_*_px_*.raw")})
+    vh_values = [vh for vh in vh_values if vh <= VH_MAX]
     if not vh_values:
-        raise SystemExit(f"No complete Vh values (up to {VH_MAX} mV) in {DATA} yet")
-    print(f"{DATA}: Vcasb = {vcasb} mV, complete Vh values {vh_values}")
+        raise SystemExit(f"No Vh values (up to {VH_MAX} mV) in {DATA}")
+    print(f"{DATA}: Vcasb = {vcasb} mV, Vh values {vh_values}")
 
     scan = fit_scan([(vcasb, vh) for vh in vh_values], f"vcasb_{vcasb}_vh_scan", data_dir=DATA)
     hits = scan["nhits"]  # indexed [vh, row, col]
@@ -215,8 +216,6 @@ def main():
     plot_histograms(thresholds, noises, OUTPUT_DIR / f"threshold_noise_hist_{tag}.png")
     plot_noise_even_odd(noises, OUTPUT_DIR / f"noise_hist_even_odd_{tag}.png")
 
-
-    ##Ploease plot the noise hist of the even and odd columns separately, to see if there is a difference
 
 if __name__ == "__main__":
     main()

@@ -1,9 +1,9 @@
 import matplotlib
-matplotlib.use("Agg")
+# matplotlib.use("Agg")  # file-only backend: uncomment to only save plots without opening windows
 import matplotlib.pyplot as plt
 import numpy as np
 
-from injection_scan import load_run, fit_gaussian, gaussian, tot_bins, DATA_DIR, PLOT_DIR
+from injection_scan import load_run, fit_gaussian, gaussian, tot_bins, ROOT
 
 """
 Plots the ToT histogram and the Gaussian fit of a few chosen pixels side by side, for one setting.
@@ -14,8 +14,8 @@ VCASB = 300
 VH = 800
 PIXELS = [(0, 31), (1, 31), (2, 31)]  # (col, row)
 
-# the default data (pulse duration = 250); for an older data set use e.g. EXTRA_DATASETS["ireset"]["data_dir"] and ["plot_dir"]
-DATA = DATA_DIR
+DATA = ROOT / "data" / "sparc7" / "injection_pd_8k_ireset_10pA"
+PLOT_DIR = ROOT / "plots" / "sparc7" / "TEST"
 LABEL = "Pulse duration = 250"
 OUTPUT_DIR = PLOT_DIR / "tot_hitmap"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
@@ -68,6 +68,7 @@ def main():
     pixel_tag = "_".join(f"{col}_{row}" for col, row in PIXELS)
     output_file = OUTPUT_DIR / f"tot_fits_vcasb_{VCASB}_vh_{VH}_px_{pixel_tag}.png"
     fig.savefig(output_file, dpi=150)
+    plt.show()
     plt.close(fig)
     print(f"Saved {output_file}")
 

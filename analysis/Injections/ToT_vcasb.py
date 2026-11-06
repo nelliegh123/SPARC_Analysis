@@ -3,7 +3,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from injection_scan import fit_scan, jitter_scatter, EXTRA_DATASETS, OLD_PLOT_DIR
+from injection_scan import fit_scan, jitter_scatter, ROOT
 
 """
 Plots the ToT vs Vcasb for a fixed Vh.
@@ -19,8 +19,8 @@ SETTINGS = f"Vh = {Vh} mV"
 
 
 N_SIGMA = 5
-DATA = EXTRA_DATASETS["old"]["data_dir"]
-OUTPUT_DIR = OLD_PLOT_DIR / "tot_vcasb"
+DATA = ROOT / "data" / "sparc0" / "injection"
+OUTPUT_DIR = ROOT / "plots" / "WrongInjections" / "tot_vcasb"
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
 #-----Removes pixels more than N_SIGMA above the mean, repeating the cut until nothing more is removed-----

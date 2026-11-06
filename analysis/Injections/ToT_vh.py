@@ -1,16 +1,17 @@
 import matplotlib
-matplotlib.use("Agg")
+# matplotlib.use("Agg")  # file-only backend: uncomment to only save plots without opening windows
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.optimize import curve_fit
-from injection_scan import fit_scan, jitter_scatter, load_run, raw_file, DATA_DIR, PLOT_DIR, DATA_VH
+from injection_scan import fit_scan, jitter_scatter, load_run, raw_file, ROOT, DATA_VH
 
 """
 Plots the mean ToT vs Vh of every pixel, with two highlighted pixels and a fit to them.
 """
 
 VCASB = 300
-DATA = DATA_DIR
+DATA = ROOT / "data" / "sparc7" / "injection_pd_8k_ireset_10pA"
+PLOT_DIR = ROOT / "plots" / "sparc7" / "TEST"
 OUT = PLOT_DIR / "tot_vh" / DATA.name
 NAME = DATA.name  
 OUT.mkdir(parents=True, exist_ok=True)
@@ -71,6 +72,7 @@ def plot(means, all_hits):
         handle.set_alpha(1)
     out = OUT / f"tot_vs_vh_{NAME}_all_pixels{'_hits' if all_hits else ''}.png"
     plt.savefig(out, dpi=150)
+    plt.show()
     plt.close()
     print(f"Saved {out}")
 
