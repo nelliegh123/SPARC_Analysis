@@ -164,7 +164,7 @@ def main():
     plt.rcParams.update({"font.size": 13})
     plt.figure(figsize=(8, 6))
     rng = np.random.default_rng(0)
-    half_width = 0.5 * np.min(np.diff(vhs)) if len(vhs) > 1 else 0
+    half_width = 0.2 * np.min(np.diff(vhs)) if len(vhs) > 1 else 0
     for i, vh in enumerate(vhs):
         y = medians[i].ravel()
         plt.plot(vh + rng.uniform(-half_width, half_width, y.size), y, ".", color="#2a9df4", alpha=0.5, ms=8, mew=0,

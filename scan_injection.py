@@ -5,8 +5,8 @@ from sparc_scanner import InjectionSettings, Scanner
 CONFIG_FILE = "SPARC.toml"
 GROUP_NAME = "sparc"
 DATA_DIR = "/home/teleuser/Nellie/data"
-CHIP = "sparc6"
-N_INJECTIONS = 3000
+CHIP = "sparc7"
+N_INJECTIONS = 5000
 PULSE_INTERVAL = 100e-6  # 100us
 COLS = range(NCOLS)
 ROWS = range(NROWS)
@@ -22,9 +22,9 @@ injs = InjectionSettings(N_INJECTIONS, PULSE_INTERVAL, COLS, ROWS)
 # for vh in list(range(30, 150, 10)) + list(range(200, 1300, 100)):
 #     scanner.scan_iteration_inj(ChipParams(300, 10, 300, 100, 100, vh), injs)
 
-# Sparc6 iron values
+# # Sparc6 iron values
 for vh in list(range(30, 150, 10)) + list(range(200, 1300, 100)):
-    scanner.scan_iteration_inj(ChipParams(300, 10, 300, 100, 200, vh), injs)
+    scanner.scan_iteration_inj(ChipParams(360, 70, 400, 700, 300, vh), injs)
     #vcasb, ireset, vcasn, ibias, idb, vh
 
 

@@ -16,7 +16,7 @@ ovp = 20.0
 _data.receive_from = ["Caribou.SPARC"]
 _data.file_conflict_strategy = "ERROR"
 
-output_directory = "/home/teleuser/Nellie/data/sparc6/injection"
+output_directory = "/home/teleuser/Nellie/data/sparc7/injection"
 buffer_size = 1
 
 [Influx.DB]
@@ -118,7 +118,7 @@ enable_row_22_even = 1
 enable_row_22_odd = 1
 enable_row_23_even = 1
 enable_row_23_odd = 1
-enable_row_24_even = 0
+enable_row_24_even = 1
 enable_row_24_odd = 1
 enable_row_25_even = 1
 enable_row_25_odd = 1

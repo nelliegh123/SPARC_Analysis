@@ -1,5 +1,5 @@
 """
-Fits the Fe-55 peak in the ToT spectrum of every pixel in the sparc6 iron55 run and plots the spectra.
+Fits the Fe-55 peak in the ToT spectrum of every pixel in iron55 run and plots the spectra.
 
 To use the results in another script (arrays are indexed [row, col], NaN where there is no fit):
     from iron55 import fit_all_pixels, load_hits
@@ -13,10 +13,15 @@ from scipy.optimize import curve_fit
 
 from sparc_analyzer import SPARCAnalyser
 
-DATA_FILE = Path("/home/teleuser/Stephan/data/sparc6/iron55/data_vcasb300_ireset10_vcasn300_ibias100_idb200_run_0.raw")
+# DATA_FILE = Path("/home/teleuser/Stephan/sparc-analysis/data/sparc6/iron55/data_vcasb300_ireset10_vcasn300_ibias100_idb200_run_0.raw")
+DATA_FILE = Path("/home/teleuser/Stephan/sparc-analysis/data/sparc6/iron55/data_vcasb300_ireset10_vcasn300_ibias100_idb200_run_0.raw")
+CHIP = 'Sparc 6'
+XRANGE = (0, 55)  
+
 OVERLAY_PIXELS = {(0, 0): "#2a9df4", (3, 3): "#e0479e", (6, 6): "#ffc000"}  # (col, row): color
 MIN_PEAK_TOT = 15  # [µs] The Fe peak is searched above this, because the low ToT pile-up is higher than the peak
 FIT_HALF_WIDTH = 3  # [µs] Only this close to the peak is fitted, because the peak has a tail on its low side
+TOT_BINS = np.linspace(0, 55, 121)  # [µs] The histogram bins that the Fe peak is fitted in
 
 
 def gaussian(x, amplitude, mean, sigma):
@@ -35,7 +40,7 @@ def load_hits():
 #I want this script to returmn or to easily be able to access a list or arrray ccontaining the mean Fe-ToT of each pixel.
 def fit_peak(tots):
     """Returns the fitted amplitude, mean [µs] and sigma [µs] of the Fe peak in the ToTs [µs] of one pixel"""
-    counts, edges = np.histogram(tots, bins=120, range=(0, 60))
+    counts, edges = np.histogram(tots, bins=TOT_BINS)
     centers = (edges[:-1] + edges[1:]) / 2
 
     above_pile_up = centers > MIN_PEAK_TOT
@@ -66,6 +71,7 @@ def fit_all_pixels(hits):
 if __name__ == "__main__":
     hits = load_hits()
     mean_tot, sigma_tot = fit_all_pixels(hits)
+    print()
     print(f"Fitted {np.count_nonzero(~np.isnan(mean_tot))} pixels")
     print(f"Mean Fe-ToT: median {np.nanmedian(mean_tot):.1f} µs, spread between pixels {np.nanstd(mean_tot):.1f} µs")
 
@@ -74,24 +80,24 @@ if __name__ == "__main__":
     plt.rcParams["font.size"] = 13
 
     plt.figure("ToT distribution", figsize=(8, 6))
-    plt.hist(hits["tot"] * 1e-3, bins=120, range=(0, 60), color="#2a9df4")
+    plt.hist(hits["tot"] * 1e-3, bins=120, range=XRANGE, color="#2a9df4")
     plt.grid(alpha=0.5)
     plt.xlabel("ToT [µs]")
     plt.ylabel("Entries")
-    plt.title("sparc6 iron55, all pixels", fontsize=11)
+    plt.title("sparc7 iron55, all pixels", fontsize=11)
     plt.tight_layout()
 
     plt.figure("Overlayed ToT distribution", figsize=(8, 6))
-    x = np.linspace(0, 60, 1000)
+    x = np.linspace(0, XRANGE, 1000)
     for (col, row), color in OVERLAY_PIXELS.items():
         tots = hits[(hits["column"] == col) & (hits["row"] == row)]["tot"].to_numpy() * 1e-3
         amplitude, mean, sigma = fit_peak(tots)
-        plt.hist(tots, bins=120, range=(0, 60), color=color, alpha=0.5, label=f"Pixel ({col}, {row})")
+        plt.hist(tots, bins=120, range=XRANGE, color=color, alpha=0.5, label=f"Pixel ({col}, {row})")
         plt.plot(x, gaussian(x, amplitude, mean, sigma), color=color, lw=2, label=f"Fit: {mean:.1f} ± {sigma:.1f} µs")
     plt.grid(alpha=0.5)
     plt.xlabel("ToT [µs]")
     plt.ylabel("Entries")
-    plt.title("sparc6 iron55", fontsize=11)
+    plt.title(f"{CHIP} iron55", fontsize=11)
     plt.legend()
     plt.tight_layout()
 
