@@ -23,8 +23,6 @@ from double_pulsing_analyzer import DoublePulsingAnalyser
 from sparc_analyzer import SPARCAnalyser
 from tqdm import tqdm
 
-from injection_chargeup import otsu_split_threshold
-
 ROOT = Path(__file__).resolve().parent.parent
 FILE_NAME = re.compile(r"data_vcasb(\d+)_ireset\d+_vcasn\d+_ibias\d+_idb\d+_vh(\d+)_c(\d+)_r(\d+)_run_0\.raw")
 COLORS = ["#e0479e", "#ffc000", "#2ca02c", "#9467bd"]

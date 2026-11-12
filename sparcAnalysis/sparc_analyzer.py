@@ -31,7 +31,8 @@ class SPARCAnalyser:
     NCOLS = 28
 
 
-    masked_pixels = [(17, 7)]
+    masked_pixels = []
+    # print(f"Pixels {masked_pixels} are masked")
     
 
     def __init__(self, file_path: Path, use_cache: bool = False, refresh_cache: bool = False) -> None:
@@ -199,7 +200,7 @@ class SPARCAnalyser:
         #     print('Masking pixels', self.masked_pixels)
 
         for i in range(len(self.masked_pixels)):
-            row, col = self.masked_pixels[i]
+            col, row = self.masked_pixels[i]
             self.hits = self.hits[~((self.hits['row'] == row) & (self.hits['column'] == col ))]
             self.active_pixels[row, col] = False
 

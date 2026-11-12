@@ -1,7 +1,7 @@
 """
 Fits the Fe-55 peak in the ToT spectrum of every pixel in iron55 run and plots the spectra.
 
-To use the results in another script (arrays are indexed [row, col], NaN where there is no fit):
+To use the results in another script (arrays are indexed [col, row], NaN where there is no fit):
     from iron55 import fit_all_pixels, load_hits
     mean_tot, sigma_tot = fit_all_pixels(load_hits())
 """
@@ -14,86 +14,137 @@ from scipy.optimize import curve_fit
 from sparc_analyzer import SPARCAnalyser
 
 # DATA_FILE = Path("/home/teleuser/Stephan/sparc-analysis/data/sparc6/iron55/data_vcasb300_ireset10_vcasn300_ibias100_idb200_run_0.raw")
-DATA_FILE = Path("/home/teleuser/Stephan/sparc-analysis/data/sparc6/iron55/data_vcasb300_ireset10_vcasn300_ibias100_idb200_run_0.raw")
-CHIP = 'Sparc 6'
-XRANGE = (0, 55)  
+DATA_FILE = Path("/home/teleuser/Stephan/sparc-analysis/data/sparc7/iron55/data_vcasb360_ireset70_vcasn400_ibias700_idb300_run_0.raw")
+CHIP = 'Sparc 7'
+XRANGE = (0, 14)  
 
-OVERLAY_PIXELS = {(0, 0): "#2a9df4", (3, 3): "#e0479e", (6, 6): "#ffc000"}  # (col, row): color
-MIN_PEAK_TOT = 15  # [µs] The Fe peak is searched above this, because the low ToT pile-up is higher than the peak
-FIT_HALF_WIDTH = 3  # [µs] Only this close to the peak is fitted, because the peak has a tail on its low side
-TOT_BINS = np.linspace(0, 55, 121)  # [µs] The histogram bins that the Fe peak is fitted in
+TOT_BINS = np.linspace(0, 14, 121)  # [µs] The histogram bins that the Fe peak is fitted in
+
+LOWER_LIMIT = 4
+
+OVERLAY_PIXELS = {(3, 3): "#e0479e", (6, 6): "#ffc000"}  # (col, row): color (26, 26): "#2a9df4",
+
+
 
 
 def gaussian(x, amplitude, mean, sigma):
     return amplitude * np.exp(-0.5 * ((x - mean) / sigma) ** 2)
 
+def double_gaussian(x, amplitude1, mean1, sigma1, amplitude2, mean2, sigma2):
+    return gaussian(x, amplitude1, mean1, sigma1) + gaussian(x, amplitude2, mean2, sigma2)
 
-#Step 1: load the sparc6 iron55 data usong sparc analyser
+
+#Step 1: load the sparc6 iron55 data using sparc analyser
 def load_hits():
     analyser = SPARCAnalyser(DATA_FILE, use_cache=True)
     analyser.do_output = False
     analyser.analyze()
     return analyser.hits
 
-
-#Step 2: fit the largest peak (to the right) and exctract the mean ToT (and sigma) of this fit.
-#I want this script to returmn or to easily be able to access a list or arrray ccontaining the mean Fe-ToT of each pixel.
-def fit_peak(tots):
+def fit_peak(tots, col, row):
     """Returns the fitted amplitude, mean [µs] and sigma [µs] of the Fe peak in the ToTs [µs] of one pixel"""
     counts, edges = np.histogram(tots, bins=TOT_BINS)
     centers = (edges[:-1] + edges[1:]) / 2
 
-    above_pile_up = centers > MIN_PEAK_TOT
-    peak = centers[above_pile_up][np.argmax(counts[above_pile_up])]
-    window = np.abs(centers - peak) < FIT_HALF_WIDTH
+    # Peak: the fullest bin above the lower limit
+    peak = np.argmax(np.where(centers > LOWER_LIMIT, counts, -1))
 
+    # Valley: the emptiest bin between the lower limit and the peak
+    before_peak = (centers > LOWER_LIMIT) & (centers < centers[peak])
+    valley = np.argmin(np.where(before_peak, counts, np.inf))
+
+    # Fit from the valley to the right (or from the lower limit if there are no bins before the peak)
+    start = centers[valley] if before_peak.any() else LOWER_LIMIT
+    fit_range = centers >= start
+
+    # Step 1: fit single Gaussian, from the valley to the right 
     try:
-        (amplitude, mean, sigma), _ = curve_fit(gaussian, centers[window], counts[window], p0=(counts[window].max(), peak, 2))
+        (amplitude, mean, sigma), _ = curve_fit(gaussian, centers[fit_range], counts[fit_range], p0=(counts[peak], centers[peak], 2))
     except RuntimeError:  # The fit did not converge
-        return np.nan, np.nan, np.nan
+        print(f"------------First (single) Gaussian fit did not converge: pixel ({col}, {row})---------")
+        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+    sigma = abs(sigma)
 
-    # Reject fits that converged outside the fitted range
-    if abs(mean - peak) > FIT_HALF_WIDTH:
-        return np.nan, np.nan, np.nan
-    return amplitude, mean, abs(sigma)
+    # # Step 2: single Gaussian again, only within ±2 sigma of the first fit
+    single_range = np.abs(centers - mean) < 1 * sigma
+    single_centers, single_counts = centers[single_range], counts[single_range]
+    try:
+        (amplitude, mean, sigma), _ = curve_fit(gaussian, single_centers, single_counts, p0=(amplitude, mean, sigma), bounds=([0, mean-sigma, 0], [np.inf, mean+sigma, 2*sigma]))
+    except (RuntimeError, ValueError):
+        print(f"------------2 sigma (single) Gaussian fit did not converge: pixel ({col}, {row})---------")
+        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, np.nan
+
+
+
+    # Step 3: double Gaussian, cut only on the left so the small peak on the right stays in
+    double_range = centers > mean - 2 * sigma
+    try:
+        (amplitude1, mean1, sigma1, amplitude2, mean2, sigma2), _ = curve_fit(double_gaussian, centers[double_range], counts[double_range],
+        p0=(amplitude, mean, sigma, amplitude/7, 1.1*mean, sigma), bounds=([0, mean-sigma, 0, 0, mean, 0], [np.inf, mean+sigma, 2*sigma, np.inf, 1.3*mean, 2*sigma]), maxfev=10000)
+    except (RuntimeError, ValueError) as error:
+        print(f"Double fit failed: pixel ({col}, {row}): {error}")
+        return np.nan, np.nan, np.nan, np.nan, np.nan, np.nan, amplitude, mean, sigma
+
+    return amplitude1, mean1, sigma1, amplitude2, mean2, sigma2, amplitude, mean, sigma
+
 
 
 def fit_all_pixels(hits):
-    """Returns the mean Fe-ToT and its sigma [µs] of every pixel, as arrays indexed [row, col]"""
-    mean_tot = np.full((SPARCAnalyser.NROWS, SPARCAnalyser.NCOLS), np.nan)
-    sigma_tot = np.full((SPARCAnalyser.NROWS, SPARCAnalyser.NCOLS), np.nan)
-    for (row, col), pixel_hits in hits.groupby(["row", "column"])["tot"]:
+    """Returns the mean Fe-ToT and its sigma [µs] of every pixel, as arrays indexed [col, row]"""
+    mean_tot1, mean_tot2 = np.full((SPARCAnalyser.NCOLS, SPARCAnalyser.NROWS), np.nan), np.full((SPARCAnalyser.NCOLS, SPARCAnalyser.NROWS), np.nan)
+    sigma_tot1, sigma_tot2 = np.full((SPARCAnalyser.NCOLS, SPARCAnalyser.NROWS), np.nan), np.full((SPARCAnalyser.NCOLS, SPARCAnalyser.NROWS), np.nan)
+    for (col, row), pixel_hits in hits.groupby(["column", "row"])["tot"]:
         if pixel_hits.size >= 100:  # Too few hits to show a peak
-            _, mean_tot[row, col], sigma_tot[row, col] = fit_peak(pixel_hits.to_numpy() * 1e-3)  # ns to µs
-    return mean_tot, sigma_tot
+            _, mean_tot1[col, row], sigma_tot1[col, row], _, mean_tot2[col, row], sigma_tot2[col, row], _, _, _ = fit_peak(pixel_hits.to_numpy() * 1e-3, col, row)  # ns to µs
+    return mean_tot1, sigma_tot1, mean_tot2, sigma_tot2
+
+
+FE_PEAKS_CACHE = Path(__file__).resolve().parent.parent / "sparcCache" / DATA_FILE.parent.parent.name / f"iron55_{DATA_FILE.stem}.npz"
+
+
+def load_fe_peaks(hits, recompute=False):
+    """Returns the same as fit_all_pixels(hits), but saves it to FE_PEAKS_CACHE the first time and reads it from there after that.
+    Use recompute=True (or delete the file) after changing the data or the fits."""
+    if FE_PEAKS_CACHE.exists() and not recompute:
+        print(f"Loading the Fe-55 peak fits from {FE_PEAKS_CACHE}")
+        with np.load(FE_PEAKS_CACHE) as cache:
+            return cache["mean_tot1"], cache["sigma_tot1"], cache["mean_tot2"], cache["sigma_tot2"]
+    mean_tot1, sigma_tot1, mean_tot2, sigma_tot2 = fit_all_pixels(hits)
+    FE_PEAKS_CACHE.parent.mkdir(parents=True, exist_ok=True)
+    np.savez(FE_PEAKS_CACHE, mean_tot1=mean_tot1, sigma_tot1=sigma_tot1, mean_tot2=mean_tot2, sigma_tot2=sigma_tot2)
+    print(f"Saved the Fe-55 peak fits to {FE_PEAKS_CACHE}")
+    return mean_tot1, sigma_tot1, mean_tot2, sigma_tot2
 
 
 if __name__ == "__main__":
     hits = load_hits()
-    mean_tot, sigma_tot = fit_all_pixels(hits)
+    mean_tot1, sigma_tot1, mean_tot2, sigma_tot2 = load_fe_peaks(hits)
     print()
-    print(f"Fitted {np.count_nonzero(~np.isnan(mean_tot))} pixels")
-    print(f"Mean Fe-ToT: median {np.nanmedian(mean_tot):.1f} µs, spread between pixels {np.nanstd(mean_tot):.1f} µs")
+    print(f"Fitted {np.count_nonzero(~np.isnan(mean_tot1))} pixels")
+    print(f"Mean Fe-ToT: median {np.nanmedian(mean_tot1):.1f} µs, spread between pixels {np.nanstd(mean_tot1):.1f} µs")
 
     #Step 3: Plot the ToT histogram for all pixels.
-    # Also plot the overlayed histogram (two or three pixels) like we do currently in sparcanalyzer, and include the gaussian fiot to the peak of these pixels
     plt.rcParams["font.size"] = 13
 
     plt.figure("ToT distribution", figsize=(8, 6))
-    plt.hist(hits["tot"] * 1e-3, bins=120, range=XRANGE, color="#2a9df4")
+    plt.hist(hits["tot"] * 1e-3, bins=120, range=XRANGE, color="#2a9df4") 
     plt.grid(alpha=0.5)
     plt.xlabel("ToT [µs]")
     plt.ylabel("Entries")
-    plt.title("sparc7 iron55, all pixels", fontsize=11)
+    plt.title(f"{CHIP} iron55, all pixels", fontsize=11)
     plt.tight_layout()
 
     plt.figure("Overlayed ToT distribution", figsize=(8, 6))
     x = np.linspace(0, XRANGE, 1000)
     for (col, row), color in OVERLAY_PIXELS.items():
         tots = hits[(hits["column"] == col) & (hits["row"] == row)]["tot"].to_numpy() * 1e-3
-        amplitude, mean, sigma = fit_peak(tots)
+        amplitude1, mean1, sigma1, amplitude2, mean2, sigma2, amplitude, mean, sigma = fit_peak(tots, col, row)
         plt.hist(tots, bins=120, range=XRANGE, color=color, alpha=0.5, label=f"Pixel ({col}, {row})")
-        plt.plot(x, gaussian(x, amplitude, mean, sigma), color=color, lw=2, label=f"Fit: {mean:.1f} ± {sigma:.1f} µs")
+        plt.plot(x, double_gaussian(x, amplitude1, mean1, sigma1, amplitude2, mean2, sigma2), color=color, lw=2, label=f"Fit: {mean1:.1f} ± {sigma1:.1f} µs")
+
+        plt.plot(x, gaussian(x, amplitude, mean, sigma), color=color, lw=2, linestyle='dashed',  label=f"First gauss fit: {mean1:.1f} ± {sigma1:.1f} µs")
+       
+
     plt.grid(alpha=0.5)
     plt.xlabel("ToT [µs]")
     plt.ylabel("Entries")
