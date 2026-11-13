@@ -6,8 +6,9 @@ from scipy.constants import e
 from scipy.optimize import OptimizeWarning, curve_fit
 
 from injection import DATA_DIR, HIGHLIGHTED_PIXELS, curved_fit, load_calibration, tot_to_vh
-from iron55 import OVERLAY_PIXELS, TOT_BINS, fit_peak, gaussian, load_fe_peaks, load_hits
+from iron55 import OVERLAY_PIXELS, TOT_BINS, fit_all_pixels, fit_peak, gaussian, load_hits
 
+CHIP = 'Sparc13'
 
 Q_FE = 1610 * e  # [C]
 Q_FE_2 = 1780 * e  # [C]
@@ -20,7 +21,7 @@ def linear_fit(x, slope):
 calibration = load_calibration()
 hits = load_hits()
 hits["tot_us"] = hits["tot"] * 1e-3  # ns to µs
-mean1, sigma1, mean2, sigma2 = load_fe_peaks(hits)
+mean1, sigma1, mean2, sigma2 = fit_all_pixels(hits)
 
 
 #Step 1: convert iron ToT to Vh using tot_to_vh
@@ -94,12 +95,16 @@ plt.hist(hits["electrons"], bins=120, range=(0, 2500), color="#2a9df4")
 plt.grid(alpha=0.5)
 plt.xlabel("Charge [electrons]")
 plt.ylabel("Entries")
-plt.title("sparc7 iron55, all pixels", fontsize=11)
+plt.title(f"{CHIP} iron55, all pixels", fontsize=11)
 plt.tight_layout()
+plt.savefig("sparc13_250")
 
 # The injected charge of every Vh point: Q = Vh * C, with each pixel's own C from Step 2
 vhs, means, mean_errors = calibration["vhs"], calibration["means"], calibration["mean_errors"]
 injected_electrons = vhs[:, None, None] * C  # [electrons], indexed [vh, col, row]
+
+
+
 
 plt.figure("ToT vs injected charge", figsize=(8, 6))
 plt.plot(injected_electrons.ravel(), means.ravel(), ".", color="#2a9df4", alpha=0.5, ms=8, mew=0, label="All pixels")
@@ -115,8 +120,9 @@ plt.ylim(bottom=0)
 plt.grid(alpha=0.5)
 plt.xlabel("Injected charge [electrons]")
 plt.ylabel("Mean ToT [µs]")
-plt.title("sparc7 injection", fontsize=11)
+plt.title(f"{CHIP} injection", fontsize=11)
 plt.legend()
 plt.tight_layout()
+plt.savefig("sparc13_vcasb250")
 
 plt.show()

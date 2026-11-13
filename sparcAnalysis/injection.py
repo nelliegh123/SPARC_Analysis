@@ -1,8 +1,11 @@
 """
 Fits the ToT of every active pixel in an injection scan with a Gaussian, and plots the mean ToT vs Vh.
 Then fits the mean ToT vs Vh of every pixel with curved_fit (a straight line that bends down near the threshold).
-Saves a CSV on the form col,row,slope [e/ns],offset [e].
 """
+
+#___________________To Do:_____________________
+# Make the ToT_to_Vh return the fit of the average of all pixels 
+# if no fit was founf, rather than taking the average over all parameters.
 
 import re
 from concurrent.futures import ProcessPoolExecutor
@@ -17,16 +20,15 @@ from injection_chargeup import otsu_threshold
 from sparc_analyzer import SPARCAnalyser
 
 ROOT = Path(__file__).resolve().parent.parent
-# DATA_DIR = ROOT / "data/sparc7/injection"
+# DATA_DIR = ROOT / "data"/ CHIP/"injection"
 CHIP = 'sparc13'
 DATA_DIR = ROOT / "../Stephan/data" / CHIP / "injection"
-
-HIGHLIGHTED_PIXELS = {(17, 20): "#e0479e", (0, 25): "#ffc000", (13, 18):"#93C47D"}  # (col, row): color
-# SPARCAnalyser.masked_pixels = [(26, 2)]
-
+lower_limit, upper_limit = 200, 150000 
+SPARCAnalyser.masked_pixels = [] #[(26, 2)] for sparc 7
 print(f"Masking pixels {SPARCAnalyser.masked_pixels}")
 
 # ----For showing a few gausuian--------
+HIGHLIGHTED_PIXELS = {(17, 20): "#e0479e", (0, 25): "#ffc000", (13, 18):"#93C47D"}  # (col, row): color
 EXAMPLE_VHS = [60, 70, 80, 90, 100]  # [mV] The Vh points of the example fits
 # ----For showing a few gausuian--------
 
@@ -49,8 +51,8 @@ def fit_pixel(file, ax=None):
     # Step 1: load the data
     analyser = SPARCAnalyser(file)
     analyser.do_output = False
-    analyser.config.add("double_pulsing_limit", 200)
-    analyser.config.add("tot_upper_limit", 150000) #Sparc7 (use 50000 for sparc6)
+    analyser.config.add("double_pulsing_limit", lower_limit)
+    analyser.config.add("tot_upper_limit", upper_limit) #Sparc7 (use 50000 for sparc6)
     analyser.analyze()
     tots = analyser.hits["tot"].to_numpy() * 1e-3
 
@@ -152,7 +154,7 @@ def calibrate():
     and the curved_fit slopes [µs/mV], intercepts [µs], cs [µs*mV], thresholds [mV] and reduced_chi_squareds indexed [col, row]"""
     files = sorted(DATA_DIR.glob("*.raw"))
     with ProcessPoolExecutor() as pool:
-        results = list(tqdm(pool.map(fit_pixel, files, chunksize=16), total=len(files)))
+        results = list(tqdm(pool.map(fit_pixel, files, chunksize=16), total=len(files), colour="#e0479e"))
     vh, col, row, mean, sigma, mean_error = np.array(results).T
 
     vhs = np.unique(vh)
@@ -165,6 +167,7 @@ def calibrate():
     mean_errors = np.full_like(means, np.nan)  # [vh, col, row]
     mean_errors[np.searchsorted(vhs, vh), col.astype(int), row.astype(int)] = mean_error
 
+    
     # Fit the mean ToT vs Vh of every pixel with curved_fit, so that tot_to_vh can use it
     slopes, intercepts, cs, thresholds, reduced_chi_squareds = fit_all_pixels(vhs, means, mean_errors)
     # print(f"Fitted {np.count_nonzero(np.isfinite(slopes))} pixels, median reduced chi2 = {np.nanmedian(reduced_chi_squareds):.2f}")
@@ -254,20 +257,21 @@ if __name__ == "__main__":
     plt.tight_layout()
 
     print("Mean reduced chi squared", np.nanmean(calibration['reduced_chi_squareds']))
+    print("Mean reduced chi squared", np.nanmedian(calibration['reduced_chi_squareds']))
 
 
 
-    # ----For showing a few gausuian--------
-    # Example fits: the ToT and Gaussian fit of the highlighted pixels at a few Vh points
-    fig, axes = plt.subplots(len(HIGHLIGHTED_PIXELS), len(EXAMPLE_VHS), figsize=(16, 6), constrained_layout=True)
-    for axes_row, (pixel_col, pixel_row) in zip(axes, HIGHLIGHTED_PIXELS):
-        for ax, example_vh in zip(axes_row, EXAMPLE_VHS):
-            file = next(DATA_DIR.glob(f"*_vh{example_vh}_c{pixel_col}_r{pixel_row}_*.raw"))
-            rejected = np.isnan(fit_pixel(file, ax)[3])
-            ax.set_title(f"Pixel ({pixel_col}, {pixel_row}), Vh = {example_vh} mV" + (" (rejected)" if rejected else ""), fontsize=10)
-            ax.grid(alpha=0.5)
-    fig.supxlabel("ToT [µs]")
-    fig.supylabel("Entries")
-    # ----For showing a few gausuian--------
+    # # ----For showing a few gausuian--------
+    # # Example fits: the ToT and Gaussian fit of the highlighted pixels at a few Vh points
+    # fig, axes = plt.subplots(len(HIGHLIGHTED_PIXELS), len(EXAMPLE_VHS), figsize=(16, 6), constrained_layout=True)
+    # for axes_row, (pixel_col, pixel_row) in zip(axes, HIGHLIGHTED_PIXELS):
+    #     for ax, example_vh in zip(axes_row, EXAMPLE_VHS):
+    #         file = next(DATA_DIR.glob(f"*_vh{example_vh}_c{pixel_col}_r{pixel_row}_*.raw"))
+    #         rejected = np.isnan(fit_pixel(file, ax)[3])
+    #         ax.set_title(f"Pixel ({pixel_col}, {pixel_row}), Vh = {example_vh} mV" + (" (rejected)" if rejected else ""), fontsize=10)
+    #         ax.grid(alpha=0.5)
+    # fig.supxlabel("ToT [µs]")
+    # fig.supylabel("Entries")
+    # # ----For showing a few gausuian--------
 
     plt.show()

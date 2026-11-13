@@ -16,12 +16,13 @@ from sparc_analyzer import SPARCAnalyser
 # DATA_FILE = Path("/home/teleuser/Stephan/sparc-analysis/data/sparc6/iron55/data_vcasb300_ireset10_vcasn300_ibias100_idb200_run_0.raw")
 # DATA_FILE = Path("/home/teleuser/Stephan/sparc-analysis/data/sparc7/iron55/data_vcasb360_ireset70_vcasn400_ibias700_idb300_run_0.raw")
 DATA_FILE = Path("/home/teleuser/Stephan/data/sparc13/iron55/data_vcasb300_ireset7_vcasn300_ibias100_idb200_run_1.raw")
+# DATA_FILE = Path("/home/teleuser/Stephan/data/sparc13/iron55/data_vcasb250_ireset7_vcasn300_ibias100_idb200_run_0.raw")
 
 CHIP = 'Sparc 13'
-XRANGE = (0, 65)  
-TOT_BINS = np.linspace(0, 65, 121)  # [µs] The histogram bins that the Fe peak is fitted in
+XRANGE = (0, 70)  
+TOT_BINS = np.linspace(0, 70, 100)  # [µs] The histogram bins that the Fe peak is fitted in
 
-LOWER_LIMIT = 4 #Set this as a value in the "valley" between the left noise peak, and the actual iron peak
+LOWER_LIMIT = 30#Set this as a value in the "valley" between the left noise peak, and the actual iron peak
 OVERLAY_PIXELS = {(3, 3): "#e0479e", (6, 6): "#ffc000"}  # (col, row): color (26, 26): "#2a9df4",
 
 
@@ -102,25 +103,9 @@ def fit_all_pixels(hits):
     return mean_tot1, sigma_tot1, mean_tot2, sigma_tot2
 
 
-#Caches result so we dont have to rerun everything all the time
-FE_PEAKS_CACHE = Path(__file__).resolve().parent.parent / "sparcCache" / DATA_FILE.parent.parent.name / f"iron55_{DATA_FILE.stem}.npz"
-def load_fe_peaks(hits, recompute=False):
-    """Returns the same as fit_all_pixels(hits), but saves it to FE_PEAKS_CACHE the first time and reads it from there after that.
-    Use recompute=True (or delete the file) after changing the data or the fits."""
-    if FE_PEAKS_CACHE.exists() and not recompute:
-        print(f"Loading the Fe-55 peak fits from {FE_PEAKS_CACHE}")
-        with np.load(FE_PEAKS_CACHE) as cache:
-            return cache["mean_tot1"], cache["sigma_tot1"], cache["mean_tot2"], cache["sigma_tot2"]
-    mean_tot1, sigma_tot1, mean_tot2, sigma_tot2 = fit_all_pixels(hits)
-    FE_PEAKS_CACHE.parent.mkdir(parents=True, exist_ok=True)
-    np.savez(FE_PEAKS_CACHE, mean_tot1=mean_tot1, sigma_tot1=sigma_tot1, mean_tot2=mean_tot2, sigma_tot2=sigma_tot2)
-    print(f"Saved the Fe-55 peak fits to {FE_PEAKS_CACHE}")
-    return mean_tot1, sigma_tot1, mean_tot2, sigma_tot2
-
-
 if __name__ == "__main__":
     hits = load_hits()
-    mean_tot1, sigma_tot1, mean_tot2, sigma_tot2 = load_fe_peaks(hits)
+    mean_tot1, sigma_tot1, mean_tot2, sigma_tot2 = fit_all_pixels(hits)
     print()
     print(f"Fitted {np.count_nonzero(~np.isnan(mean_tot1))} pixels")
     print(f"Mean Fe-ToT: median {np.nanmedian(mean_tot1):.1f} µs, spread between pixels {np.nanstd(mean_tot1):.1f} µs")
@@ -129,7 +114,7 @@ if __name__ == "__main__":
     #Also plots the iron spectra of a few chosen pixels, with their gaussian and double gaussian fit
     plt.rcParams["font.size"] = 13
     plt.figure("ToT distribution", figsize=(8, 6))
-    plt.hist(hits["tot"] * 1e-3, bins=120, range=XRANGE, color="#2a9df4") 
+    plt.hist(hits["tot"] * 1e-3, bins=TOT_BINS, color="#2a9df4") 
     plt.grid(alpha=0.5)
     plt.xlabel("ToT [µs]")
     plt.ylabel("Entries")
@@ -141,7 +126,7 @@ if __name__ == "__main__":
     for (col, row), color in OVERLAY_PIXELS.items():
         tots = hits[(hits["column"] == col) & (hits["row"] == row)]["tot"].to_numpy() * 1e-3
         amplitude1, mean1, sigma1, amplitude2, mean2, sigma2, amplitude, mean, sigma = fit_peak(tots, col, row)
-        plt.hist(tots, bins=120, range=XRANGE, color=color, alpha=0.5, label=f"Pixel ({col}, {row})")
+        plt.hist(tots, bins=TOT_BINS, color=color, alpha=0.5, label=f"Pixel ({col}, {row})")
         plt.plot(x, double_gaussian(x, amplitude1, mean1, sigma1, amplitude2, mean2, sigma2), color=color, lw=2, label=f"Fit: {mean1:.1f} ± {sigma1:.1f} µs")
         plt.plot(x, gaussian(x, amplitude, mean, sigma), color=color, lw=2, linestyle='dashed',  label=f"First gauss fit: {mean1:.1f} ± {sigma1:.1f} µs")
     plt.grid(alpha=0.5)
