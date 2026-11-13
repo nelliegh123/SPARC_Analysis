@@ -1,91 +1,94 @@
-#THis code will combine the results from injection.py and iron55.py.
+import warnings
+
 import matplotlib.pyplot as plt
 import numpy as np
 from scipy.constants import e
+from scipy.optimize import OptimizeWarning, curve_fit
 
 from injection import DATA_DIR, HIGHLIGHTED_PIXELS, curved_fit, load_calibration, tot_to_vh
 from iron55 import OVERLAY_PIXELS, TOT_BINS, fit_peak, gaussian, load_fe_peaks, load_hits
-from sparc_analyzer import SPARCAnalyser
 
 
 Q_FE = 1610 * e  # [C]
-Q_FE_2 = 1780 * e
-CSV_PATH = DATA_DIR.parent / "calibration.csv"  # col,row,slope [e/ns],offset [e]
+Q_FE_2 = 1780 * e  # [C]
 
-def tot_to_charge(tot_ns):
-    s = a_bar * Q_thr + b
-    u = s**2 + a_bar * c_bar - s * tot_ns
-    charge = Q_thr + (2 * c_bar * tot_ns) / (sqrt(4 * a_bar * s * c_bar * tot_ns + u**2) + u)
-    return charge
+CSV_PATH = DATA_DIR.parent / "calibration.csv"  # One row per pixel: the curved_fit parameters and the capacitance, see Step 3
 
-def vh_to_electrons(vh, capacitance):
-    """Returns the charge [electrons] from Q=C*Vh, with Vh in mV and the capacitance in fF"""
-    return capacitance * 1e-15 * vh * 1e-3 / e
+def linear_fit(x, slope):
+    return slope * x
 
-
-#Step1: Use the per pixel fit of ToT vs Vh to calibrate the Iron55 from being in units of ToT, to being in units of Vh.
 calibration = load_calibration()
 hits = load_hits()
-mean_tot_fe, _, _, _ = load_fe_peaks(hits)  # The Fe peak is fitted in ToT by iron55.py, indexed [col, row]
-cols, rows = np.indices(mean_tot_fe.shape)
-vh_fe = tot_to_vh(mean_tot_fe, cols, rows, calibration)
-
-hits["vh"] = tot_to_vh(hits["tot"].to_numpy() * 1e-3, hits["column"].to_numpy(), hits["row"].to_numpy(), calibration)  # ns to µs
-hits = hits.dropna(subset=["vh"])  # Pixels without a ToT vs Vh fit
+hits["tot_us"] = hits["tot"] * 1e-3  # ns to µs
+mean1, sigma1, mean2, sigma2 = load_fe_peaks(hits)
 
 
-#Step 2: calculate the capacitance of each pixel.
-capacitance = Q_FE / (vh_fe * 1e-3) * 1e15  # [fF]
+#Step 1: convert iron ToT to Vh using tot_to_vh
+vh1_iron, vh2_iron = np.full(mean1.shape, np.nan), np.full(mean2.shape, np.nan)  # [mV], indexed [col, row]
+for col, row in np.ndindex(mean1.shape):
+    tot1, tot2 = mean1[col][row], mean2[col][row]
+    vh1_iron[col][row] = tot_to_vh(tot1, col, row, calibration)
+    vh2_iron[col][row] = tot_to_vh(tot2, col, row, calibration)
 
-print(f"Fitted {np.count_nonzero(np.isfinite(capacitance))} pixels")
-print(f"Vh of the Fe peak: median {np.nanmedian(vh_fe):.0f} mV, spread between pixels {np.nanstd(vh_fe):.0f} mV")
-print(f"Capacitance: median {np.nanmedian(capacitance):.3f} fF, spread between pixels {np.nanstd(capacitance):.3f} fF")
+
+#Step 2: for each pixel fit Q vs ToT. Vh = slope * Q, a line through zero
+slopes_q = np.full(mean1.shape, np.nan)  # [mV/e], indexed [col, row]
+for col, row in np.ndindex(mean1.shape):
+    x = (Q_FE / e, Q_FE_2 / e)  # [electrons]
+    y = (vh1_iron[col][row], vh2_iron[col][row])
+    if not np.all(np.isfinite(y)):  # No Fe peaks in this pixel
+        continue
+    (slope,), _ = curve_fit(linear_fit, x, y)
+    slopes_q[col][row] = slope
+C = 1 / slopes_q  # [e/mV]
+
+# Safety check against a bad Fe peak fit: keep pixels within 50 % of the median C
+outlier = np.abs(C / np.nanmedian(C) - 1) > 0.5
+print()
+print(f"Removing {np.count_nonzero(outlier)} pixels with C more than 50 % from the median")
+C[outlier] = np.nan
+print(f"C: median {np.nanmedian(C):.3f} e/mV, spread between pixels {np.nanstd(C):.3f} e/mV, from {np.count_nonzero(np.isfinite(C))} pixels")
+print()
 
 
-#Step 3: convert the injected charge from vh to electrons using Q=C_pixel*Vh
-vhs, means, sigmas = calibration["vhs"], calibration["means"], calibration["sigmas"]
-slopes, intercepts = calibration["slopes"], calibration["intercepts"]
-electrons = vh_to_electrons(vhs[:, None, None], capacitance)
+#Step 3: Use the ToT to charge conversion as
 
-pixel_electrons_per_mv = vh_to_electrons(1, capacitance)  # [e/mV], indexed [col, row]
-slopes_e = pixel_electrons_per_mv / slopes * 1e-3  # [e/ns], µs to ns
-offsets_e = -pixel_electrons_per_mv * intercepts / slopes  # [e]
-valid = np.isfinite(slopes_e) & np.isfinite(offsets_e)
-average_slope_e, average_offset_e = slopes_e[valid].mean(), offsets_e[valid].mean()  # Best effort for pixels without a calibration
+#convert a => ā = a / C_inj, b => b̄, c => c̄ = c * C_inj, V_h,thr => Q_thr = V_h,thr * C_inj
+# The line from Step 2 passes through zero, so b̄ = b.
+# The µs from the injection fit are converted to ns, so the parameters match tot_ns.
+a_bar = calibration["slopes"] / C * 1e3  # [ns/e]
+b_bar = calibration["intercepts"] * 1e3 #+ 0 * C  # [ns], + 0 * C so that pixels without a C are NaN here too
+c_bar = calibration["cs"] * C * 1e3  # [ns*e]
+Q_thr = calibration["thresholds"] * C  # [e]
+
+def tot_to_charge(tot_ns, a_bar, b, c_bar, Q_thr):
+    s = a_bar * Q_thr + b
+    u = s**2 + a_bar * c_bar - s * tot_ns
+    charge = Q_thr + (2 * c_bar * tot_ns) / (np.sqrt(4 * a_bar * s * c_bar * tot_ns + u**2) + u)
+    return charge
+
+
+
+#Step 4: save the data in a csv file
+pixel_params = np.array([a_bar, b_bar, c_bar, Q_thr])  
+valid = np.all(np.isfinite(pixel_params), axis=0)  
+average_params = np.mean(pixel_params[:, valid], axis=1) 
+# average_params = np.median(pixel_params[:, valid], axis=1) 
 
 with open(CSV_PATH, "w") as csv_file:
-    csv_file.write("col,row,slope [e/ns],offset [e]\n")
-    csv_file.write(f"-1,-1,{average_slope_e:.6g},{average_offset_e:.6g}\n")
+    csv_file.write("col,row,slope [ns/e],offset [ns],bend [ns*e],threshold [e]\n")
+    csv_file.write("-1,-1," + ",".join(f"{p:.6g}" for p in average_params) + "\n")
     for col, row in zip(*np.nonzero(valid)):
-        csv_file.write(f"{col},{row},{slopes_e[col, row]:.6g},{offsets_e[col, row]:.6g}\n")
-print(f"Wrote the calibration of {valid.sum()} pixels to {CSV_PATH}, average {average_slope_e:.3g} e/ns, {average_offset_e:.3g} e")
+        csv_file.write(f"{col},{row}," + ",".join(f"{p:.6g}" for p in pixel_params[:, col, row]) + "\n")
+print(f"Wrote the calibration of {valid.sum()} pixels to {CSV_PATH}, the other {np.count_nonzero(~valid)} pixels use the average")
+filled_params = np.where(valid, pixel_params, average_params[:, None, None])  
 
 
-#Step 4: convert the iron55 spectra from ToT to electrons, using Q=C_pixel*Vh
-hits["electrons"] = vh_to_electrons(hits["vh"].to_numpy(), capacitance[hits["column"].to_numpy(), hits["row"].to_numpy()])
+#Step5: USe the ToT_to_charge to plot th calibrated iron spectra (in units of e) and the calibrated ToT vs Vh. scan (in units of e)
+hit_cols, hit_rows = hits["column"].to_numpy(), hits["row"].to_numpy()
+hits["electrons"] = tot_to_charge(hits["tot"].to_numpy(), *filled_params[:, hit_cols, hit_rows])
 
-
-
-#---Plottign------
-#Plotting the mean ToT/pixel vs the injected chage
 plt.rcParams["font.size"] = 13
-plt.figure("ToT vs charge", figsize=(8, 6))
-plt.plot(electrons.ravel(), means.ravel(), ".", color="#2a9df4", alpha=0.5, ms=8, mew=0, label="All pixels")
-for (pixel_col, pixel_row), color in HIGHLIGHTED_PIXELS.items():
-    pixel_electrons = electrons[:, pixel_col, pixel_row]
-    plt.errorbar(pixel_electrons, means[:, pixel_col, pixel_row], yerr=sigmas[:, pixel_col, pixel_row], fmt="o", color=color, ms=6, capsize=3, label=f"Pixel ({pixel_col}, {pixel_row})")
-    plt.plot(pixel_electrons, curved_fit(vhs, slopes[pixel_col, pixel_row], intercepts[pixel_col, pixel_row], calibration["cs"][pixel_col, pixel_row], calibration["thresholds"][pixel_col, pixel_row]), "k--", lw=1.5)
-plt.ylim(bottom=0)
-plt.grid(alpha=0.5)
-plt.xlabel("Injected charge [electrons]")
-plt.ylabel("Mean ToT [µs]")
-plt.title("sparc7 injection", fontsize=11)
-plt.legend()
-plt.tight_layout()
-
-
-
-#Plotting the iron55 spectra in electrons
 plt.figure("Charge distribution", figsize=(8, 6))
 plt.hist(hits["electrons"], bins=120, range=(0, 2500), color="#2a9df4")
 plt.grid(alpha=0.5)
@@ -94,45 +97,26 @@ plt.ylabel("Entries")
 plt.title("sparc7 iron55, all pixels", fontsize=11)
 plt.tight_layout()
 
-plt.figure("Overlayed charge distribution", figsize=(8, 6))
-x = np.linspace(TOT_BINS[0], TOT_BINS[-1], 1000)  # [µs]
-for (pixel_col, pixel_row), color in OVERLAY_PIXELS.items():
-    pixel_tots = hits[(hits["column"] == pixel_col) & (hits["row"] == pixel_row)]["tot"].to_numpy() * 1e-3  # ns to µs
-    pixel_capacitance = capacitance[pixel_col, pixel_row]
-    electrons_per_us = vh_to_electrons(1 / calibration["slopes"][pixel_col, pixel_row], pixel_capacitance)
+# The injected charge of every Vh point: Q = Vh * C, with each pixel's own C from Step 2
+vhs, means, mean_errors = calibration["vhs"], calibration["means"], calibration["mean_errors"]
+injected_electrons = vhs[:, None, None] * C  # [electrons], indexed [vh, col, row]
 
-    def tot_to_electrons(tot):
-        return vh_to_electrons(tot_to_vh(tot, pixel_col, pixel_row, calibration), pixel_capacitance)
-
-    # The peak is fitted in ToT by iron55.py, and the histogram and the fit are then converted to electrons
-    amplitude1, mean1, sigma1, *_ = fit_peak(pixel_tots, pixel_col, pixel_row)
-    counts, _ = np.histogram(pixel_tots, bins=TOT_BINS)
-    plt.stairs(counts, tot_to_electrons(TOT_BINS), fill=True, color=color, alpha=0.5, label=f"Pixel ({pixel_col}, {pixel_row})")
-    plt.plot(tot_to_electrons(x), gaussian(x, amplitude1, mean1, sigma1), color=color, lw=2, label=f"Fit: {tot_to_electrons(mean1):.0f} ± {sigma1 * electrons_per_us:.0f} electrons")
+plt.figure("ToT vs injected charge", figsize=(8, 6))
+plt.plot(injected_electrons.ravel(), means.ravel(), ".", color="#2a9df4", alpha=0.5, ms=8, mew=0, label="All pixels")
+for (pixel_col, pixel_row), color in HIGHLIGHTED_PIXELS.items():
+    if not valid[pixel_col, pixel_row]:
+        print(f"Pixel ({pixel_col}, {pixel_row}): no calibration, not highlighted")
+        continue
+    pixel_electrons = injected_electrons[:, pixel_col, pixel_row]
+    plt.errorbar(pixel_electrons, means[:, pixel_col, pixel_row], yerr=mean_errors[:, pixel_col, pixel_row], fmt="o", color=color, ms=6, capsize=3, label=f"Pixel ({pixel_col}, {pixel_row})")
+    fit_electrons = np.linspace(Q_thr[pixel_col, pixel_row], np.nanmax(pixel_electrons), 300)  # From the threshold (ToT = 0), below it the curve goes through its pole
+    plt.plot(fit_electrons, curved_fit(fit_electrons, *pixel_params[:, pixel_col, pixel_row]) * 1e-3, "--", color=color, lw=1.5)  # ns to µs
+plt.ylim(bottom=0)
 plt.grid(alpha=0.5)
-plt.xlabel("Charge [electrons]")
-plt.ylabel("Entries")
-plt.title("sparc7 iron55", fontsize=11)
+plt.xlabel("Injected charge [electrons]")
+plt.ylabel("Mean ToT [µs]")
+plt.title("sparc7 injection", fontsize=11)
 plt.legend()
 plt.tight_layout()
-
-
-#Step 5: overlay the uncalibrated and calibrated iron55 spectra.
-median_capacitance = np.nanmedian(capacitance)
-uncalibrated_vh = (hits["tot"].to_numpy() * 1e-3 - np.nanmedian(intercepts)) / np.nanmedian(slopes)  # ns to µs
-electrons_per_mv = vh_to_electrons(1, median_capacitance)
-
-fig, ax = plt.subplots(num="Uncalibrated vs calibrated", figsize=(8, 6))
-ax.hist(uncalibrated_vh * electrons_per_mv, bins=120, range=(0, 2500), color="#e0479e", alpha=0.5, label="Uncalibrated (same conversion for all pixels)")
-ax.hist(hits["electrons"], bins=120, range=(0, 2500), histtype="step", color="#2a9df4", lw=2, label="Calibrated (per pixel)")
-ax.grid(alpha=0.5)
-ax.set_xlabel("Charge [electrons]")
-ax.set_ylabel("Entries")
-ax.set_title("sparc7 iron55, all pixels", fontsize=11)
-ax.legend()
-
-top_axis = ax.secondary_xaxis("top", functions=(lambda electrons: electrons / electrons_per_mv, lambda vh: vh * electrons_per_mv))
-top_axis.set_xlabel("Vh [mV]")
-fig.tight_layout()
 
 plt.show()
